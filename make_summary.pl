@@ -29,13 +29,13 @@ my %type_expected = ( month => [qw( M01 M02 M03 M04 M05 M06 M07 M08 M09 M10 M11 
 		      );
 
 
-my $task = 'guide_stat_reports';
+my $task = 'acq_stat_reports';
 my $SKA = $ENV{SKA} || '/proj/sot/ska';
 my $SHARE = "${SKA}/share/guide_stat_db";
 my $WEBDATA = "${SKA}/www/ASPECT/${task}";
 my $SKADATA = "${SKA}/data/${task}";
 
-my $datafile = 'gs_report.yml';
+my $datafile = 'acq_report.yml';
 my $webprefix = "http://icxc.harvard.edu/ska/guidestats/";
 
 my @exist_dirs;
@@ -92,7 +92,7 @@ $table .= qq{ <TR><TD><IMG SRC="./bad_stars.gif"></TD></TR> };
 $table .= qq{ </TABLE> };
 
 $table .= qq{ <TABLE BORDER=1> };
-$table .= qq{ <TR><TH>DirNum</TH><TH>$title</TH><TH>$title Bad Rate</TH><TH>Mission Bad Rate</TH><TH>$title Failed Rate</TH><TH>Mission Failed Rate</TH><TH>$title OBC Bad Status</TH><TH>Mission OBC Bad Status</TH></TR> };
+$table .= qq{ <TR><TH>DirNum</TH><TH>$title</TH><TH>$title Failed Acq Rate</TH><TH>Mission Failed Acq Rate</TH></TR> };
 
 # Now that I'm not making reports for no-data intervals, I've got to figure out how many dirs I should have
 my @dirs;
@@ -126,29 +126,17 @@ for my $idx (0 ... $#dirs){
 #	push @{$plots{webdir}}, $dirname;
 #    push @{$plots{bad_track_stars}}, $data{DATA}->{report}->{bad_track_stars};
 	
-	push @{$plots{bad_track_rate}}, $data{DATA}->{report}->{bad_track_rate};
-	push @{$plots{mission_bad_track_rate}}, $data{DATA}->{mission}->{bad_track_rate};
-	push @{$plots{obc_bad_status_rate}}, $data{DATA}->{report}->{obc_bad_status_rate};
-	push @{$plots{mission_obc_bad_status_rate}}, $data{DATA}->{mission}->{obc_bad_status_rate};
-	push @{$plots{fail_track_rate}}, $data{DATA}->{report}->{fail_track_rate};
-	push @{$plots{mission_fail_track_rate}}, $data{DATA}->{mission}->{fail_track_rate};
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{report}->{bad_track_rate});
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{mission}->{bad_track_rate});
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{report}->{fail_track_rate});
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{mission}->{fail_track_rate});
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{report}->{obc_bad_status_rate});
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{mission}->{obc_bad_status_rate});
+	push @{$plots{failed_acq_rate}}, $data{DATA}->{report}->{failed_acq_rate};
+	push @{$plots{mission_failed_acq_rate}}, $data{DATA}->{mission}->{failed_acq_rate};
+	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{report}->{failed_acq_rate});
+	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{mission}->{failed_acq_rate});
 
     }
     else{
 	$table .= qq{ <TR><TD>$idx</TD><TD>$dirabbrev</TD> };
 	print "No data for $dirname \n";
-	push @{$plots{bad_track_rate}}, undef;
-	push @{$plots{mission_bad_track_rate}}, undef;
-	push @{$plots{obc_bad_status_rate}}, undef;
-	push @{$plots{mission_obc_bad_status_rate}}, undef;
-	push @{$plots{fail_track_rate}}, undef;
-	push @{$plots{mission_fail_track_rate}}, undef;
+	push @{$plots{failed_acq_rate}}, undef;
+	push @{$plots{mission_failed_acq_rate}}, undef;
 	$table .= sprintf("<TD colspan=6></TD>");
     }
     $table .= qq{ </TR> };
@@ -165,7 +153,7 @@ use PDL;
 
 my @plot1 = (
 	    'x' => pdl(@{$plots{dirnum}}),
-	    'y' => pdl(@{$plots{bad_track_rate}})*100,
+	    'y' => pdl(@{$plots{failed_acq_rate}})*100,
 	    panel => [1,1],
 #	    logy => 1,
 #	    lims => [$mag_start,$mag_stop, 0.2, undef],
@@ -174,81 +162,19 @@ my @plot1 = (
 			 title => 2.0,
 			 axis => 2.0,
 		     },
-	    toptitle => "Bad Star Rate",
+	    toptitle => "Failed Acq Rate",
 	    xtitle => "$title from 2000-01",
-	    ytitle => "Bad Track Rate x100 (Red = Mission )",
+	    ytitle => "Failed Acq Rate x100 (Red = Mission )",
 #	    toptitle => "Mags for good (black) and bad (red) guide stars",
 #	    xtitle => 'Star magnitude (mag)',
 #	    ytitle => 'Number (red is x100)',
 #	    @label,
 	    plot => 'bin',
 	    'x' => pdl(@{$plots{dirnum}})+0.1,
-	    'y' => pdl(@{$plots{mission_bad_track_rate}})*100,
+	    'y' => pdl(@{$plots{mission_failed_acq_rate}})*100,
 	    color => { line => 'red' },
 	    plot => 'bin',
 	    );
-
-my @plot2 = (
-	    'x' => pdl(@{$plots{dirnum}}),
-	    'y' => pdl(@{$plots{fail_track_rate}})*100,
-	    panel => [2,1],
-#	    logy => 1,
-#	    lims => [$mag_start,$mag_stop, 0.2, undef],
-	    options => {center => 1},
-	    charsize => {symbol => 0.7,
-			 title => 2.0,
-			 axis => 2.0,
-		     },
-	    toptitle => "Fail Star Rate",
-	    xtitle => "$title from 2000-01",
-	    ytitle => "Fail Rate x100 (Red = Mission )",
-#	    toptitle => "Mags for good (black) and bad (red) guide stars",
-#	    xtitle => 'Star magnitude (mag)',
-#	    ytitle => 'Number (red is x100)',
-#	    @label,
-	    plot => 'bin',
-	    'x' => pdl(@{$plots{dirnum}})+0.1,
-	    'y' => pdl(@{$plots{mission_fail_track_rate}})*100,
-	    color => { line => 'red' },
-	    plot => 'bin',
-
-#	    'x' => pdl(@mag_bin)+0.1,
-#	    'y' => pdl(@bad_track_x100)+.01,
-#	    color => { line => 'red' },
-#	    plot => 'bin',
-	    );
-
-
-my @plot3 = (
-	    'x' => pdl(@{$plots{dirnum}}),
-	    'y' => pdl(@{$plots{obc_bad_status_rate}})*100,
-	    panel => [3,1],
-#	    logy => 1,
-#	    lims => [$mag_start,$mag_stop, 0.2, undef],
-	    options => {center => 1},
-	    charsize => {symbol => 0.7,
-			 title => 2.0,
-			 axis => 2.0,
-		     },
-	    toptitle => "OBC Bad Status Rate",
-	    xtitle => "$title from 2000-01",
-	    ytitle => "OBC Bad Rate x100 (Red = Mission)",
-#	    toptitle => "Mags for good (black) and bad (red) guide stars",
-#	    xtitle => 'Star magnitude (mag)',
-#	    ytitle => 'Number (red is x100)',
-#	    @label,
-	    plot => 'bin',
-	    'x' => pdl(@{$plots{dirnum}})+0.1,
-	    'y' => pdl(@{$plots{mission_obc_bad_status_rate}})*100,
-	    color => { line => 'red' },
-	    plot => 'bin',
-
-#	    'x' => pdl(@mag_bin)+0.1,
-#	    'y' => pdl(@bad_track_x100)+.01,
-#	    color => { line => 'red' },
-#	    plot => 'bin',
-	    );
-
 
 
 #print Dumper %plots;
@@ -263,8 +189,8 @@ pgs_plot(
 	 ysize => 4,
 	 device => $file,
 	 @plot1,
-	 @plot2,
-	 @plot3,
+#	 @plot2,
+#	 @plot3,
 	 );
 $file =~ s/\/vcps$//;
 my $psfile = $file;
