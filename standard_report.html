@@ -1,0 +1,46 @@
+<HTML>
+<HEAD>
+<TITLE>Acquisition Statistics Report</TITLE>
+<link href="/mta/ASPECT/aspect.css" rel="stylesheet" type="text/css"
+media="all" />
+  <style type="text/css">
+  body { min-width:900px;
+  background:url('http://asc.harvard.edu/mta/ASPECT/blue_paper.gif');
+  }
+}
+</style>
+
+</HEAD>
+<BODY>
+
+<H2>Acquisition Statistics Report<!--#include virtual="title.htm"--></H2>
+<H3><!--#include virtual="human_date_start.htm"--> through
+<!--#include virtual="human_date_stop.htm"--> </H3>
+
+
+<TABLE BORDER=1>
+<TR><TH>TSTART</TH><TH>TSTOP</TH></TR>
+<TR><TD><!--#include virtual="date_start.htm"--></TD><TD><!--#include virtual="date_stop.htm"--></TD></TR>
+</TABLE>
+
+
+<!--#include virtual="main_table.htm" -->
+
+
+<TABLE>
+<TR><TD><!--#include virtual="mag_histogram_plot.htm"--></TD><TD><!--#include virtual="zoom_mag_histogram_plot.htm"--></TD></TR>
+<TR><TD><!--#include virtual="mag_pointhist_plot.htm"--></TD><TD><!--#include virtual="zoom_mag_pointhist_plot.htm"--></TD></TR>
+<TR><TD><!--#include virtual="stars_per_obsid_histogram_plot.htm"--></TD><TD><!--#include virtual="stars_per_obsid_mission_histogram_plot.htm"--></TD></TR>
+<TR><TD><!--#include virtual="exp_mag_histogram_plot.htm"--></TD><TD></TD></TR>
+<TR><TD><!--#include virtual="delta_mag_scatter_plot.htm"--></TD><TD></TD></TR>
+
+
+</TABLE>
+
+<!--#include virtual="tail_mag_loop_table.htm" -->
+
+</BODY>
+</HTML>
+
+
+      

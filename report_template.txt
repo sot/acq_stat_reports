@@ -1,0 +1,70 @@
+Guide Statistics Report
+
+For the interval:
+%DATE_START% - %DATE_STOP%
+
+Bad or Lost Stars are those stars with %TRACK_BAD_PERCENT% % or more of the
+kalman interval spent not tracking.
+
+Bad status stars are those star with %STATUS_BAD_PERCENT% % or more of
+the kalman interval spent with bad obc status flags
+
+----------------------------------------------------------------------------
+Tracking Rate of Bad or Lost Stars
+----------------------------------------------------------------------------
+
+For the mission, the rate of bad stars per 100 stars:
+%TRACK_EXP_BAD_RATE%
+
+Number of guide stars during the interval of this report:
+%TRACK_N_STARS%
+
+Number of bad or lost stars during the interval of this report:
+%TRACK_N_BAD_STARS%
+
+Interval bad star rate per 100 stars:
+%TRACK_BAD_RATE%
+
+Probability of seeing %TRACK_N_BAD_STARS% or less (expected %TRACK_EXP_N% ):
+%TRACK_PROB_N_LESS%
+
+Probability of seeing %TRACK_N_BAD_STARS% or more (expected %TRACK_EXP_N% ):
+%TRACK_PROB_N_MORE%
+
+
+----------------------------------------------------------------------------
+Tracking Rate of Bad Status Stars
+----------------------------------------------------------------------------
+
+For the mission, the rate of stars with bad status per 100 stars:
+%STATUS_EXP_BAD_RATE%
+
+Number of guide stars during the interval of this report:
+%STATUS_N_STARS%
+
+Number of bad or lost stars during the interval of this report:
+%STATUS_N_BAD_STARS%
+
+Interval bad star rate per 100 stars:
+%STATUS_BAD_RATE%
+
+Probability of seeing %STATUS_N_BAD_STARS% or less (expected %STATUS_EXP_N% ):
+%STATUS_PROB_N_LESS%
+
+Probability of seeing %STATUS_N_BAD_STARS% or more (expected %STATUS_EXP_N% ):
+%STATUS_PROB_N_MORE%
+
+
+----------------------------------------------------------------------------
+List of Bad or Lost Stars
+----------------------------------------------------------------------------
+%TRACK_BAD_STAR_LIST%
+
+----------------------------------------------------------------------------
+List of Bad Status Stars
+----------------------------------------------------------------------------
+%STATUS_BAD_STAR_LIST%
+
+
+
+      
