@@ -16,7 +16,8 @@ use Ska::Report::TimeRange;
 use Pod::Help qw( -help);
 
 #use Ska::AcqStats::Report;
-require "Report.pm";
+use Ska::StarStats::Report;
+#require "Report.pm";
 
 =pod
 
