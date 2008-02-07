@@ -1,5 +1,5 @@
 # Set the task name
-TASK = guide_stat_reports
+TASK = acq_stat_reports
 PERLTASK = AcqStats
 
 # set a version for the "make dist" option
@@ -29,7 +29,7 @@ include /proj/sot/ska/include/Makefile.FLIGHT
 #CGI = guide_stat_web_query.cgi show_month_stats.cgi
 #DATA = 
 SHARE = make_report.pl make_summary.pl make_toc.pl report.yaml standard_report.html all_plot_report.html
-PROJLIB = Report.pm
+#PROJLIB = Report.pm
 
 
 # Define outside data and bin dependencies required for testing,
