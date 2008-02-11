@@ -292,7 +292,7 @@ plots:
       start: 0
       stop: 9
       bin: 1
-      plot_name: stars_per_obsid_histogram.gif
+      plot_name: id_per_obsid_histogram.gif
       pad_log: 0
       black:
          bin_over: id_cnt
@@ -321,7 +321,7 @@ plots:
       start: 0
       stop: 9
       bin: 1
-      plot_name: stars_per_obsid_mission_histogram.gif
+      plot_name: id_per_obsid_mission_histogram.gif
       pad_log: 0
       black:
          bin_over: id_cnt

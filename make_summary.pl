@@ -36,7 +36,8 @@ my $WEBDATA = "${SKA}/www/ASPECT/${task}";
 my $SKADATA = "${SKA}/data/${task}";
 
 my $datafile = 'acq_report.yml';
-my $webprefix = "http://icxc.harvard.edu/ska/guidestats/";
+my $webprefix = 'http://cxc.harvard.edu/mta/ASPECT/acq_stat_reports/';
+#my $webprefix = "http://icxc.harvard.edu/ska/guidestats/";
 
 my @exist_dirs;
 my $title;
@@ -126,10 +127,11 @@ for my $idx (0 ... $#dirs){
 #	push @{$plots{webdir}}, $dirname;
 #    push @{$plots{bad_track_stars}}, $data{DATA}->{report}->{bad_track_stars};
 	
-	push @{$plots{failed_acq_rate}}, $data{DATA}->{report}->{failed_acq_rate};
-	push @{$plots{mission_failed_acq_rate}}, $data{DATA}->{mission}->{failed_acq_rate};
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{report}->{failed_acq_rate});
-	$table .= sprintf("<TD>%6.3f</TD>", $data{DATA}->{mission}->{failed_acq_rate});
+
+	push @{$plots{failed_acq_rate}}, $data{report}->{failed_acq_rate};
+	push @{$plots{mission_failed_acq_rate}}, $data{mission}->{failed_acq_rate};
+	$table .= sprintf("<TD>%6.3f</TD>", $data{report}->{failed_acq_rate});
+	$table .= sprintf("<TD>%6.3f</TD>", $data{mission}->{failed_acq_rate});
 
     }
     else{
@@ -196,5 +198,5 @@ $file =~ s/\/vcps$//;
 my $psfile = $file;
 $file =~ s/\.ps/.gif/;
 use Ska::Run;
-run("convert -antialias $psfile $file");
+run("convert -antialias $psfile $file", loud => 1);
 
