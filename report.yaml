@@ -29,13 +29,14 @@ data:
    count_field: "count(agasc_id)"
 
    rates:
-      - rate: failed_acq 
+      - name: failed_acq 
         value: "NOID"
         field: obc_id 
 
    loops:
       - bin_over: mag
-        get: rates
+        get: 
+           - rate: failed_acq
         start: 10.0
         stop: 10.8
         bin: .1

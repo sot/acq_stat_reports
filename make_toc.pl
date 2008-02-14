@@ -63,12 +63,15 @@ my %exist_dirs;
 push @{$exist_dirs{month}}, map { $_ =~ s/${SKADATA}\///; $_  } glob("${SKADATA}/????/M[01]?");
 push @{$exist_dirs{quarter}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADATA}/????/Q?");
 push @{$exist_dirs{semi}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADATA}/????/S?");
-push @{$exist_dirs{year}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADATA}/????");
+push @{$exist_dirs{year_dir}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADATA}/????");
+push @{$exist_dirs{year}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADATA}/????/YEAR/");
+
 
 
 #print Dumper %exist_dirs;
 
 my $toc;
+
 $toc .= qq{ <HTML><HEAD><TITLE>Acquisition Statistics Reports</TITLE> \n} ;
 $toc .= qq{ <link href="/mta/ASPECT/aspect.css" rel="stylesheet" type="text/css" media="all" /> \n};
 $toc .= qq{    <style type="text/css"> \n };
@@ -76,6 +79,24 @@ $toc .= qq{ body { min-width:900px; background:url('http://asc.harvard.edu/mta/A
 $toc .= qq{    </style> \n };
 $toc .= qq{ </HEAD><BODY> };
 $toc .= qq{ <H3>Acquisition Statistics Reports</H3> \n };
+
+
+$toc .= qq{ <H4>Summary Reports</H4> };
+$toc .= qq{ <TABLE BORDER=1><TR> };
+for my $type qw( Year Semi Quarter Month ){
+    my $lctype = lc($type);
+    $toc .= qq{ <TD><A HREF="${webprefix}/${lctype}_summary">By $type</A></TD> }
+}
+$toc .= qq{ </TR></TABLE> };
+
+
+$toc .= qq{ <H4>Special Reports</H4> };
+$toc .= qq{ <A HREF="${webprefix}/all_mission">Mission</A><BR />\n};
+$toc .= qq{ <A HREF="${webprefix}/mission_since_2003">Mission Since 2003</A><BR />\n};
+
+$toc .= qq{ </BODY></HTML> };
+
+
 $toc .= qq{ <H4>Individual Reports</H4> \n};
 
 
@@ -94,7 +115,7 @@ for my $typestring qw( Month Quarter Semi Year ){
     $toc .= qq{<TR>};
 
 
-    for my $year ( $year_start ... $exist_dirs{year}->[-1] ){
+    for my $year ( $year_start ... $exist_dirs{year_dir}->[-1] ){
 	$toc .= qq{<TR><TD><A HREF=\"${webprefix}/${year}/YEAR/${indexfile}\">$year</A></TD>};
 	my $type = lc($typestring);
 	my $interval_count = 0;
@@ -108,9 +129,9 @@ for my $typestring qw( Month Quarter Semi Year ){
 	    my $string = "${interval_year}/${interval}";
 
 	    my $interval_colspan = $colspan{$type}->[$interval_count];
-	    print "$interval_year $interval $string $interval_colspan\n";
+#	    print "$interval_year $interval $string $interval_colspan\n";
 	    if (grep( /$string/, @{$exist_dirs{$type}})){
-		$toc .= qq{ <TD colspan=${interval_colspan}><A HREF=\"${webprefix}/${interval_year}/${interval}/${indexfile}\">$text</A></TD> }
+		$toc .= qq{ <TD align=center colspan=${interval_colspan}><A HREF=\"${webprefix}/${interval_year}/${interval}/${indexfile}\">$text</A></TD> }
 	    }
 	    else{
 		$toc .= qq{ <TD colspan=${interval_colspan}>&nbsp;</TD> };
@@ -127,21 +148,6 @@ for my $typestring qw( Month Quarter Semi Year ){
 
 
 
-
-$toc .= qq{ <H4>Summary Reports</H4> };
-$toc .= qq{ <TABLE BORDER=1><TR> };
-for my $type qw( Year Semi Quarter Month ){
-    my $lctype = lc($type);
-    $toc .= qq{ <TD><A HREF="${webprefix}/${lctype}_summary">By $type</A></TD> }
-}
-$toc .= qq{ </TR></TABLE> };
-
-
-$toc .= qq{ <H4>Special Reports</H4> };
-$toc .= qq{ <A HREF="${webprefix}/all_mission">Mission</A><BR />\n};
-$toc .= qq{ <A HREF="${webprefix}/mission_since_2003">Mission Since 2003</A><BR />\n};
-
-$toc .= qq{ </BODY></HTML> };
 
 
 my $outfile = "index.html";

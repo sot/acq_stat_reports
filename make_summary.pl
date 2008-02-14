@@ -185,9 +185,9 @@ my $file = $starfile;
 $file =~ s/\.gif/\.ps\/vcps/;
 $file = "${outdir}/" . $file;
 pgs_plot(
-	 nx => 3,
+	 nx => 1,
 	 ny => 1,
-	 xsize => 12,
+	 xsize => 8,
 	 ysize => 4,
 	 device => $file,
 	 @plot1,
