@@ -118,7 +118,7 @@ for my $idx (0 ... $#dirs){
     push @{$plots{dirnum}}, $idx;
 
     if (-e "${SKADATA}/${dirname}/${datafile}"){
-	print "report for $dirname \n";
+#	print "report for $dirname \n";
 	my %data = %{YAML::LoadFile("${SKADATA}/${dirname}/${datafile}")};
 	$table .= qq{ <TR><TD>$idx</TD><TD><A HREF="${webprefix}/${dirname}">$dirabbrev</A></TD> };
 #    my $dirabbrev = $dirname;
