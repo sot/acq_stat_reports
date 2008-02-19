@@ -136,7 +136,7 @@ for my $idx (0 ... $#dirs){
     }
     else{
 	$table .= qq{ <TR><TD>$idx</TD><TD>$dirabbrev</TD> };
-	print "No data for $dirname \n";
+#	print "No data for $dirname \n";
 	push @{$plots{failed_acq_rate}}, undef;
 	push @{$plots{mission_failed_acq_rate}}, undef;
 	$table .= sprintf("<TD colspan=6></TD>");
