@@ -122,10 +122,10 @@ if (defined $opt{update}){
 	$opt{predefined} = $label;
 	$label =~ s/-/\//g;
 	if (-e "${SKADATA}/${label}" ){
-	    print "${label} - Up to date. \n";
+#	    print "${label} - Up to date. \n";
 	}
 	else{
-	    print "${label} - Updating ... \n";
+#	    print "${label} - Updating ... \n";
 	    run_predefined( { config => \%config, opt => \%opt });
 	}
     }
