@@ -116,7 +116,7 @@ for my $typestring qw( Month Quarter Semi Year ){
 
 
     for my $year ( $year_start ... $exist_dirs{year_dir}->[-1] ){
-	$toc .= qq{<TR><TD><A HREF=\"${webprefix}/${year}/YEAR/${indexfile}\">$year</A></TD>};
+	$toc .= qq{<TR><TD>$year</TD>};
 	my $type = lc($typestring);
 	my $interval_count = 0;
 	for my $interval (@{$type_expected{$type}}){
