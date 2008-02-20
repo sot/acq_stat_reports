@@ -114,7 +114,7 @@ if ( defined $opt{predefined} ){
 
     
 if (defined $opt{update}){
-    my @intervals = qw( month quarter year );
+    my @intervals = qw( month quarter semi year );
     for my $type (@intervals){
 	my $interval = Ska::Report::TimeRange->new( $type, { out_fmt => 'datetie'} )->find_prev();
 	my $range_ref = $interval->range();
