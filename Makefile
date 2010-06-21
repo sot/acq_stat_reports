@@ -13,6 +13,7 @@ include /proj/sot/ska/include/Makefile.FLIGHT
 SHARE = make_report.py make_toc.pl
 TEMPLATES = templates/index.html templates/stars.html
 
+install:
 ifdef TEMPLATES
 	mkdir -p $(INSTALL_SHARE)/templates/
 	rsync --times --cvs-exclude $(TEMPLATES) $(INSTALL_SHARE)/templates/
