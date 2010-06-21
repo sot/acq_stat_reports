@@ -1,0 +1,22 @@
+<HTML>
+<HEAD></HEAD>
+<BODY>
+<TABLE BORDER=1>
+<TR><TH>id</TH><TH>obsid</TH><TH>mag</TH><TH>mag_obs</TH><TH>obc_id</TH></TR>
+
+{% for star in failed_stars %}
+<TR>
+<TD ALIGN="right">
+<A HREF="{{ nav.star_cgi }}{{ star.id }};">{{ star.id }}</A></TD>
+<TD ALIGN="right">
+<A HREF="{{ nav.starcheck_cgi }}{{ star.obsid }}">{{ star.obsid }}</A></TD>
+<TD ALIGN="right">{{ "%.2f"|format(star.mag_exp) }}</TD>
+<TD ALIGN="right">{{ "%.2f"|format(star.mag_obs) }}</TD>
+<TD ALIGN="right">{{ star.acq_stat }}</TD>
+</TR>
+{% endfor %}
+
+</TABLE> 
+
+</BODY>
+</HTML>
