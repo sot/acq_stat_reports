@@ -10,7 +10,7 @@ FLIGHT_ENV = SKA
 
 include /proj/sot/ska/include/Makefile.FLIGHT
 
-SHARE = make_report.py make_toc.pl
+SHARE = acq_stat_reports.py make_toc.pl
 TEMPLATES = templates/index.html templates/stars.html
 
 install:
