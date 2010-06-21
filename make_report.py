@@ -15,17 +15,18 @@ if __name__ == '__main__':
         import matplotlib.pyplot as plt
 
 import jinja2
+import scipy.stats
 
 import Ska.DBI
 from Chandra.Time import DateTime
 
-
+# local to project
 import histOutline
 import timerange
 
 task = 'acq_stat_reports'
-#TASK_SHARE = os.path.join(os.environ['SKA'],'share', task)
-TASK_SHARE = "."
+TASK_SHARE = os.path.join(os.environ['SKA'],'share', task)
+#TASK_SHARE = "."
 
 jinja_env = jinja2.Environment(
 	loader=jinja2.FileSystemLoader(os.path.join(TASK_SHARE, 'templates')))
@@ -51,7 +52,16 @@ def get_options():
 
 
 def frac_points( acq, mag_bin, binstart=None ):
+    """
+    Calculate the fraction of NOID stars in the bins requested, where acq is a recarray
+    of the acq stars, mag_bin is the mag range width of the binning, and binstart is
+    a list of the left start of the bins.
 
+    Return the left edge of the bins (x), the fraction of good acq stars (fracs),
+    the low limit on the error of fracs (err_low), and the high limit on the error
+    of fraces (err_high).  Returns a list of lists.
+    """
+    
     x = []
     fracs = []
     err_high = []
@@ -69,7 +79,6 @@ def frac_points( acq, mag_bin, binstart=None ):
                 err_high_lim = err_low_lim
             else:
                 err_high_lim = 1 - frac
-            #            print frac, '\t', err_low_lim, '\t', err_high_lim
             err_high.append(err_high_lim)
             err_low.append(err_low_lim)
         else:
@@ -247,6 +256,14 @@ def make_id_plots( ids, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.savefig(os.path.join(outdir, 'id_per_obsid_mission_histogram.png'))
 
 def make_html( nav_dict, rep_dict, fail_dict, outdir):
+    """
+    Render and write the basic page, where nav_dict is a dictionary of the
+    navigation elements (locations of UP_TO_MAIN, NEXT, PREV), rep_dict is
+    a dictionary of the main data elements (n failures etc), fail_dict
+    contains the elements required for the extra table of failures at the
+    bottom of the page, and outdir is the destination directory.
+    """
+
     template = jinja_env.get_template('index.html')
     page = template.render(nav=nav_dict, fails=fail_dict, rep=rep_dict)
     f = open(os.path.join(outdir, 'index.html'), 'w')
@@ -254,6 +271,9 @@ def make_html( nav_dict, rep_dict, fail_dict, outdir):
     f.close()
 
 class NoStarError(Exception):
+    """
+    Special error for the case when no acquisition stars are found.
+    """
     def __init__(self, value):
         self.value = value
     def __str__(self):
@@ -261,6 +281,19 @@ class NoStarError(Exception):
 
 def acq_info( acqs, tname, mxdatestart, mxdatestop,
 	      pred_start='2003:001:00:00:00.000' ):
+    """
+    Generate a report dictionary for the time range.
+
+    :param acqs: recarray of all acquisition stars available in the table
+    :param tname: timerange string (e.g. 2010-M05)
+    :param mxdatestart: mx.DateTime of start of reporting interval
+    :param mxdatestop: mxDateTime of end of reporting interval
+    :param pred_start: date for beginning of time range for predictions based
+    on average from pred_start to now()
+
+    :rtype: dict of report values
+    """
+	
     rep = { 'datestring' : tname,
 	    'datestart' : DateTime(mxdatestart).date,
 	    'datestop' : DateTime(mxdatestop).date,
@@ -283,15 +316,17 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop,
                               / len(pred_acqs))
     rep['n_failed_pred'] = int(round(rep['fail_rate_pred'] * rep['n_stars']))
 
-    import scipy.stats
+
     rep['prob_less'] = scipy.stats.poisson.cdf( rep['n_failed'], rep['n_failed_pred'] )
     rep['prob_more'] = 1 - scipy.stats.poisson.cdf( rep['n_failed'] - 1,
 						    rep['n_failed_pred'] )
-    
+
     return rep
 
 def make_fail_html( stars, outfile):
-
+    """
+    Render and write the expanded table of failed stars
+    """
     nav_dict = dict(star_cgi='https://icxc.harvard.edu/cgi-bin/aspect/get_stats/get_stats.cgi?id=',
 	       starcheck_cgi='https://icxc.harvard.edu/cgi-bin/aspect/starcheck_print/starcheck_print.cgi?sselect=obsid;obsid1=')
     template = jinja_env.get_template('stars.html')
@@ -304,6 +339,12 @@ def make_fail_html( stars, outfile):
 
 def acq_fails( acqs, tname, mxdatestart, mxdatestop,
 	      pred_start='2003:001:00:00:00.000', outdir='out'):
+    """
+    Find the failures over the interval and find the tail mag failures.
+    Pass the failures to make_fail_html for the main star table and the
+    little ones (by mag bin).
+    """
+
     fails = []
     range_acqs = acqs[ (acqs.tstart >= DateTime(mxdatestart).secs)
 		       & (acqs.tstart < DateTime(mxdatestop).secs) ]
@@ -358,12 +399,19 @@ def acq_fails( acqs, tname, mxdatestart, mxdatestop,
 
 
 def main(opt):
+    """
+    Update acquisition statistics plots.  Mission averages are computed with all stars
+    from 2003:001 to the end of the interval.
+    """
+    
     sqlaca = Ska.DBI.DBI(dbi='sybase', server='sybase', numpy=True)
     min_acq_time = DateTime('2003:001:00:00:00.000')
 
     all_acq = sqlaca.fetchall('select * from acq_stats_data where tstart >= %f'
                               % min_acq_time.secs )
 
+    # use the acq_stats_id_by_obsid view for a quick count of the number of ID/NOID
+    # stars in each obsid.  Used by make_id_plots()
     all_id = sqlaca.fetchall('select * from acq_stats_id_by_obsid where tstart >= %f' % 
                              min_acq_time.secs )
 
@@ -371,10 +419,15 @@ def main(opt):
 
     for tname in to_update.keys():
 
+        log.debug("Attempting to update %s" % tname )
         try:
 	    mxdatestart = to_update[tname]['start']
 	    mxdatestop = to_update[tname]['stop']
 
+	    # ignore acquisition stars that are newer than the end of the range
+	    # in question (happens during reprocessing) for consistency
+	    all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
+	    all_id_upto = all_id[ all_id.tstart <= DateTime(mxdatestop).secs ]
 
 	    out = os.path.join(opt.outdir,
 			       "%s" % to_update[tname]['year'],
@@ -384,14 +437,14 @@ def main(opt):
 	    if not os.path.exists(out):
 		    os.makedirs(out)
 
-	    rep = acq_info(all_acq, tname, mxdatestart, mxdatestop)
+	    rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop)
 		    
 	    import json
 	    rep_file = open(os.path.join(out, 'rep.json'), 'w')
 	    rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
 	    rep_file.close()
 
-	    fails = acq_fails(all_acq, tname, mxdatestart, mxdatestop, outdir=out)
+	    fails = acq_fails(all_acq_upto, tname, mxdatestart, mxdatestop, outdir=out)
 	    fail_file = open(os.path.join(out, 'fail.json'), 'w')
 	    fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
 	    fail_file.close()
@@ -409,11 +462,11 @@ def main(opt):
 					     'index.html'),
 		       )
 
-	    make_acq_plots( all_acq,
+	    make_acq_plots( all_acq_upto,
 			    tstart=DateTime(mxdatestart).secs,
 			    tstop=DateTime(mxdatestop).secs,
 			    outdir=out)
-	    make_id_plots( all_id,
+	    make_id_plots( all_id_upto,
 			   tstart=DateTime(mxdatestart).secs,
 			   tstop=DateTime(mxdatestop).secs,
 			   outdir=out)
