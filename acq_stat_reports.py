@@ -21,8 +21,9 @@ import Ska.DBI
 from Chandra.Time import DateTime
 
 # local to project
-import histOutline
-import timerange
+import Ska.Matplotlib
+import Ska.report_ranges
+
 
 task = 'acq_stat_reports'
 TASK_SHARE = os.path.join(os.environ['SKA'],'share', task)
@@ -32,17 +33,24 @@ jinja_env = jinja2.Environment(
 	loader=jinja2.FileSystemLoader(os.path.join(TASK_SHARE, 'templates')))
 
 logger = logging.getLogger(task)
-
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(message)s')
 
 def get_options():
     from optparse import OptionParser
     parser = OptionParser()
     parser.set_defaults()
-    parser.add_option("--outdir",
+    parser.add_option("--datadir",
+                      default="/proj/sot/ska/data/acq_stat_reports/",
+                      help="Output directory")
+    parser.add_option("--webdir",
                       default="/proj/sot/ska/www/ASPECT/acq_stat_reports/",
                       help="Output directory")
     parser.add_option("--url",
-		      default="http://cxc.harvard.edu/mta/ASPECT/acq_stat_reports/")
+		      default="/mta/ASPECT/acq_stat_reports/")
+    parser.add_option("--days_back",
+		      default=30,
+		      type='int')
     parser.add_option("--verbose",
                       type='int',
                       default=1,
@@ -119,13 +127,13 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     mag_bin = .1
     good = range_acqs[ range_acqs.obc_id == 'ID' ]
     # use unfilled histograms from a scipy example
-    (bins, data) = histOutline.histOutline(good.mag,
+    (bins, data) = Ska.Matplotlib.hist_outline(good.mag,
 					   bins=np.arange(5.5-(mag_bin/2),
 							  12+(mag_bin/2),mag_bin))
     plt.semilogy(bins, data+tiny_y, 'k-')
     bad = range_acqs[ range_acqs.obc_id == 'NOID' ]
 
-    (bins, data) = histOutline.histOutline(bad.mag,
+    (bins, data) = Ska.Matplotlib.hist_outline(bad.mag,
 					   bins=np.arange(5.5-(mag_bin/2),
 							  12+(mag_bin/2),mag_bin))
     plt.semilogy(bins, 100*data+tiny_y, 'r-')
@@ -139,12 +147,12 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     # Scaled Failure Histogram, tail mag range
     plt.figure(figsize=figsize)
     mag_bin = .05
-    (bins, data) = histOutline.histOutline(good.mag,
+    (bins, data) = Ska.Matplotlib.hist_outline(good.mag,
 					   bins=np.arange(5.5-(mag_bin/2),
 							  12+(mag_bin/2),mag_bin))
     plt.semilogy(bins, data+tiny_y, 'k-')
     bad = range_acqs[ range_acqs.obc_id == 'NOID' ]
-    (bins, data) = histOutline.histOutline(bad.mag,
+    (bins, data) = Ska.Matplotlib.hist_outline(bad.mag,
 					   bins=np.arange(5.5-(mag_bin/2),
 							  12+(mag_bin/2),mag_bin))
     plt.semilogy(bins, 100*data+tiny_y, 'r-')
@@ -415,63 +423,71 @@ def main(opt):
     all_id = sqlaca.fetchall('select * from acq_stats_id_by_obsid where tstart >= %f' % 
                              min_acq_time.secs )
 
-    to_update = timerange.get_update_ranges()
+    to_update = Ska.report_ranges.get_update_ranges(opt.days_back)
 
-    for tname in to_update.keys():
+    for tname in sorted(to_update.keys()):
 
-        log.debug("Attempting to update %s" % tname )
+        logger.debug("Attempting to update %s" % tname )
         try:
-	    mxdatestart = to_update[tname]['start']
-	    mxdatestop = to_update[tname]['stop']
+		mxdatestart = to_update[tname]['start']
+		mxdatestop = to_update[tname]['stop']
 
-	    # ignore acquisition stars that are newer than the end of the range
-	    # in question (happens during reprocessing) for consistency
-	    all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
-	    all_id_upto = all_id[ all_id.tstart <= DateTime(mxdatestop).secs ]
+		# ignore acquisition stars that are newer than the end of the range
+		# in question (happens during reprocessing) for consistency
+		all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
+		all_id_upto = all_id[ all_id.tstart <= DateTime(mxdatestop).secs ]
 
-	    out = os.path.join(opt.outdir,
-			       "%s" % to_update[tname]['year'],
-			       to_update[tname]['subid'])
+		webout = os.path.join(opt.webdir,
+				      "%s" % to_update[tname]['year'],
+				      to_update[tname]['subid'])
+		if not os.path.exists(webout):
+			os.makedirs(webout)
 
-	    log.debug("Writing to %s" % out)
-	    if not os.path.exists(out):
-		    os.makedirs(out)
+		dataout = os.path.join(opt.datadir,
+				       "%s" % to_update[tname]['year'],
+				       to_update[tname]['subid'])
 
-	    rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop)
-		    
-	    import json
-	    rep_file = open(os.path.join(out, 'rep.json'), 'w')
-	    rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
-	    rep_file.close()
+		if not os.path.exists(dataout):
+			os.makedirs(dataout)
 
-	    fails = acq_fails(all_acq_upto, tname, mxdatestart, mxdatestop, outdir=out)
-	    fail_file = open(os.path.join(out, 'fail.json'), 'w')
-	    fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
-	    fail_file.close()
+		logger.debug("Plots and HTML to %s" % webout)
+		logger.debug("JSON to  %s" % dataout)
 
-	    prev_range = timerange.get_prev(to_update[tname])
-	    next_range = timerange.get_next(to_update[tname])
-	    nav = dict(main=opt.url,
-		       next="%s/%s/%s/%s" % (opt.url,
-					     next_range['year'],
-					     next_range['subid'],
-					     'index.html'),
-		       prev="%s/%s/%s/%s" % (opt.url,
-					     prev_range['year'],
-					     prev_range['subid'],
-					     'index.html'),
-		       )
+		rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop)
 
-	    make_acq_plots( all_acq_upto,
-			    tstart=DateTime(mxdatestart).secs,
-			    tstop=DateTime(mxdatestop).secs,
-			    outdir=out)
-	    make_id_plots( all_id_upto,
-			   tstart=DateTime(mxdatestart).secs,
-			   tstop=DateTime(mxdatestop).secs,
-			   outdir=out)
+		import json
+		rep_file = open(os.path.join(dataout, 'rep.json'), 'w')
+		rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
+		rep_file.close()
 
-	    make_html(nav, rep, fails, outdir=out)
+		fails = acq_fails(all_acq_upto, tname, mxdatestart, mxdatestop, outdir=webout)
+		fail_file = open(os.path.join(dataout, 'fail.json'), 'w')
+		fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
+		fail_file.close()
+
+		prev_range = Ska.report_ranges.get_prev(to_update[tname])
+		next_range = Ska.report_ranges.get_next(to_update[tname])
+		nav = dict(main=opt.url,
+			   next="%s/%s/%s/%s" % (opt.url,
+						 next_range['year'],
+						 next_range['subid'],
+						 'index.html'),
+			   prev="%s/%s/%s/%s" % (opt.url,
+						 prev_range['year'],
+						 prev_range['subid'],
+						 'index.html'),
+			   )
+
+		make_acq_plots( all_acq_upto,
+				tstart=DateTime(mxdatestart).secs,
+				tstop=DateTime(mxdatestop).secs,
+				outdir=webout)
+		make_id_plots( all_id_upto,
+				   tstart=DateTime(mxdatestart).secs,
+			       tstop=DateTime(mxdatestop).secs,
+			       outdir=webout)
+
+		make_html(nav, rep, fails, outdir=webout)
 	except Exception, msg:
 	    print "ERROR: Unable to process %s" % tname, msg
 	

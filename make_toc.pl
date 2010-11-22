@@ -52,10 +52,11 @@ my $task = 'acq_stat_reports';
 my $SKA = $ENV{SKA} || '/proj/sot/ska';
 my $SHARE = "${SKA}/share/${task}";
 my $WEBDATA = "${SKA}/www/ASPECT/${task}";
-my $SKADATA = "${SKA}/data/${task}";
+my $SKADATA = $WEBDATA;
+#my $SKADATA = "${SKA}/data/${task}";
 
 #my $datafile = 'gs_report.yml';
-my $webprefix = "http://cxc.harvard.edu/mta/ASPECT/${task}";
+my $webprefix = "/mta/ASPECT/${task}";
 my $indexfile = 'index.html';
 
 my %exist_dirs;
@@ -67,15 +68,12 @@ push @{$exist_dirs{year_dir}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADAT
 push @{$exist_dirs{year}}, map { $_ =~ s/${SKADATA}\///; $_ } glob("${SKADATA}/????/YEAR/");
 
 
-
-#print Dumper %exist_dirs;
-
 my $toc;
 
 $toc .= qq{ <HTML><HEAD><TITLE>Acquisition Statistics Reports</TITLE> \n} ;
 $toc .= qq{ <link href="/mta/ASPECT/aspect.css" rel="stylesheet" type="text/css" media="all" /> \n};
 $toc .= qq{    <style type="text/css"> \n };
-$toc .= qq{ body { min-width:900px; background:url('http://asc.harvard.edu/mta/ASPECT/blue_paper.gif'); \n  }};
+$toc .= qq{ body { min-width:900px; background:url('http://cxc.harvard.edu/mta/ASPECT/blue_paper.gif'); \n  }};
 $toc .= qq{    </style> \n };
 $toc .= qq{ </HEAD><BODY> };
 $toc .= qq{ <H3>Acquisition Statistics Reports</H3> \n };
@@ -145,9 +143,6 @@ for my $typestring qw( Month Quarter Semi Year ){
 
     $toc .= qq{ </TABLE> \n};
 }
-
-
-
 
 
 my $outfile = "index.html";
