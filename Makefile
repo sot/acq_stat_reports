@@ -2,7 +2,7 @@
 TASK = acq_stat_reports
 
 # set a version for the "make dist" option
-VERSION = 2.0
+VERSION = 2.1
 
 # Uncomment the correct choice indicating either SKA or TST flight environment
 FLIGHT_ENV = SKA
@@ -12,6 +12,7 @@ include /proj/sot/ska/include/Makefile.FLIGHT
 
 SHARE = acq_stat_reports.py make_toc.pl
 TEMPLATES = templates/index.html templates/stars.html
+DATA = task_schedule.cfg
 
 install:
 ifdef TEMPLATES
