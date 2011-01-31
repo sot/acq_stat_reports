@@ -36,6 +36,20 @@ logger = logging.getLogger(task)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(message)s')
 
+# cheated and grabbed 95% confidence intervals from http://statpages.org/confint.html
+ppois_conf = { 0 : [ 0, 3.6899 ],
+               1 : [ .0253, 5.5716 ],
+               2 : [ .2422, 7.2247 ],
+               3 : [ .6187, 8.7673 ],
+               4 : [ 1.0899, 10.2416 ],
+               5 : [ 1.6235, 11.6683 ],
+               6 : [ 2.2019, 13.0595 ],
+               7 : [ 2.8144, 14.4277 ],
+               8 : [ 3.4538, 15.7632 ],
+               9 : [ 4.1154, 17.0848 ],
+               10 : [ 4.7954, 18.3904]} 
+
+
 def get_options():
     from optparse import OptionParser
     parser = OptionParser()
@@ -48,6 +62,8 @@ def get_options():
                       help="Output directory")
     parser.add_option("--url",
 		      default="/mta/ASPECT/acq_stat_reports/")
+    parser.add_option("--start_time",
+                  default=None)
     parser.add_option("--days_back",
 		      default=30,
 		      type='int')
@@ -123,7 +139,7 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     range_acqs = acqs[ (acqs.tstart >= tstart) & (acqs.tstart < tstop ) ]
 
     # Scaled Failure Histogram, full mag range
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     mag_bin = .1
     good = range_acqs[ range_acqs.obc_id == 'ID' ]
     # use unfilled histograms from a scipy example
@@ -143,9 +159,10 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('N good (black) and bad (red) stars vs Mag')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'mag_histogram.png'))
+    plt.close(h)
 
     # Scaled Failure Histogram, tail mag range
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     mag_bin = .05
     (bins, data) = Ska.Matplotlib.hist_outline(good.mag,
 					   bins=np.arange(5.5-(mag_bin/2),
@@ -163,9 +180,10 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('N good (black) and bad (red) stars vs Mag')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'zoom_mag_histogram.png'))
+    plt.close(h)
 
     # Acquisition Success Fraction, full mag range
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     mag_bin = .1
     (x, fracs, err_low, err_high ) = frac_points( range_acqs , mag_bin, binstart=np.arange(5.5-(mag_bin/2),12+(mag_bin/2),mag_bin))
     plt.errorbar( x, fracs, yerr=[err_low, err_high], color='black', marker='.', linestyle='None')    
@@ -178,9 +196,10 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('Acquisition Success vs Expected Mag')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'mag_pointhist.png'))
+    plt.close(h)
 
     # Acquisition Success Fraction, tail mag range
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     mag_bin = 0.05
     (x, fracs, err_low, err_high ) = frac_points( range_acqs , mag_bin, binstart=np.arange(10-(mag_bin/2),11+(mag_bin/2),mag_bin))
     plt.errorbar( x, fracs, yerr=[err_low, err_high], color='black', marker='.', linestyle='None')    
@@ -193,9 +212,9 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('Acquisition Success vs Expected Mag')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'zoom_mag_pointhist.png'))
+    plt.close(h)
 
-
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     plt.hist(range_acqs.mag, bins=np.arange(5.5-(mag_bin/2),12+(mag_bin/2),mag_bin), histtype='step',color='black',normed=True)
     plt.hist(acqs.mag, bins=np.arange(5.5-(mag_bin/2),12+(mag_bin/2),mag_bin), histtype='step',color='red',normed=True)
     plt.xlabel('Star magnitude (mag)')
@@ -212,7 +231,7 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('Delta Mag vs Mag')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'delta_mag_scatter.png'))
-
+    plt.close(h)
 
 
 def make_id_plots( ids, tstart=0, tstop=DateTime().secs, outdir="plots"):
@@ -236,7 +255,7 @@ def make_id_plots( ids, tstart=0, tstop=DateTime().secs, outdir="plots"):
     id_by_obsid = ids[ (ids.tstart >= tstart) & (ids.tstart < tstop ) ]
 
     figsize=(5,2.5)
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     plt.hist(id_by_obsid.id_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='black')
     plt.hist(id_by_obsid.noid_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='red')
     ylims = plt.ylim()
@@ -247,11 +266,12 @@ def make_id_plots( ids, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('ID Acq Stars per obsid (Interval)')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'id_per_obsid_histogram.png'))
+    plt.close(h)
 
     # N ids per obsid over mission
     id_by_obsid_all = ids
 
-    plt.figure(figsize=figsize)
+    h=plt.figure(figsize=figsize)
     plt.hist(id_by_obsid_all.id_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='black')
     plt.hist(id_by_obsid_all.noid_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='red')
     ylims = plt.ylim()
@@ -262,6 +282,7 @@ def make_id_plots( ids, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.title('ID Acq Stars per obsid (Mission)')
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'id_per_obsid_mission_histogram.png'))
+    plt.close(h)
 
 def make_html( nav_dict, rep_dict, fail_dict, outdir):
     """
@@ -288,7 +309,7 @@ class NoStarError(Exception):
         return repr(self.value)
 
 def acq_info( acqs, tname, mxdatestart, mxdatestop,
-	      pred_start='2003:001:00:00:00.000' ):
+	      pred_start='2000:001:00:00:00.000' ):
     """
     Generate a report dictionary for the time range.
 
@@ -318,9 +339,10 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop,
     if not len(range_acqs):
         raise NoStarError("No acq stars in range")
     rep['n_failed'] = len(np.flatnonzero(range_acqs.obc_id == 'NOID'))
-    rep['fail_rate'] = rep['n_failed']*1.0/rep['n_stars']
+    rep['fail_rate'] = 1.0*rep['n_failed']/rep['n_stars']
 
-    rep['fail_rate_pred'] = ( len(np.flatnonzero(pred_acqs.obc_id == 'NOID'))*1.0
+    rep['fail_rate_pred'] = ( len(np.flatnonzero(pred_acqs.obc_id == 'NOID'))
+                              *1.0
                               / len(pred_acqs))
     rep['n_failed_pred'] = int(round(rep['fail_rate_pred'] * rep['n_stars']))
 
@@ -328,6 +350,19 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop,
     rep['prob_less'] = scipy.stats.poisson.cdf( rep['n_failed'], rep['n_failed_pred'] )
     rep['prob_more'] = 1 - scipy.stats.poisson.cdf( rep['n_failed'] - 1,
 						    rep['n_failed_pred'] )
+
+    # use Poisson confidence if number small
+    if rep['n_failed'] <= 10:
+        low_conf = ppois_conf[rep['n_failed']][0]
+        high_conf = ppois_conf[rep['n_failed']][1]
+        rep['fail_rate_err_low'] = rep['fail_rate'] - (low_conf/(rep['n_stars']*1.0))
+        rep['fail_rate_err_high'] = (high_conf/(rep['n_stars']*1.0)) - rep['fail_rate']
+    else:
+        rep['fail_rate_err_low'] = np.sqrt(rep['n_failed'])/(rep['n_stars']*1.0)
+        rep['fail_rate_err_high'] = rep['fail_rate_err_low']
+    # I don't think the high err limits are necessary on this data set, but
+    if rep['fail_rate_err_high'] + rep['fail_rate'] > 1:
+        rep['fail_rate_err_high'] = 1 - rep['fail_rate']                                
 
     return rep
 
@@ -346,7 +381,7 @@ def make_fail_html( stars, outfile):
 
 
 def acq_fails( acqs, tname, mxdatestart, mxdatestop,
-	      pred_start='2003:001:00:00:00.000', outdir='out'):
+	      pred_start='2000:001:00:00:00.000', outdir='out'):
     """
     Find the failures over the interval and find the tail mag failures.
     Pass the failures to make_fail_html for the main star table and the
@@ -361,11 +396,11 @@ def acq_fails( acqs, tname, mxdatestart, mxdatestop,
     failed_stars = []
     for fail in all_fails:
         star=dict(id=fail.agasc_id,
-		  obsid=fail.obsid,
-		  mag_exp=fail.mag,
-		  mag_obs=fail.mag_obs,
-		  acq_stat='NOID')
-	failed_stars.append(star)
+                  obsid=fail.obsid,
+                  mag_exp=fail.mag,
+                  mag_obs=fail.mag_obs,
+                  acq_stat='NOID')
+        failed_stars.append(star)
     make_fail_html(failed_stars, os.path.join(outdir, 'failed_acq_stars_list.html'))
 
     bin = .1
@@ -373,31 +408,30 @@ def acq_fails( acqs, tname, mxdatestart, mxdatestop,
 
         mag_range_acqs = range_acqs[ (range_acqs.mag >= tmag_start)
 				     & (range_acqs.mag < (tmag_start + bin))]
-
         mfailed_stars = []
-	mag_fail_acqs = mag_range_acqs[ mag_range_acqs.obc_id == 'NOID' ]
-	for mfail in mag_fail_acqs:
-	    star=dict(id=mfail.agasc_id,
-		      obsid=mfail.obsid,
-		      mag_exp=mfail.mag,
-		      mag_obs=mfail.mag_obs,
-		      acq_stat='NOID')
-	mfailed_stars.append(star)
-	failed_star_file = "failed_acq_%.1f_stars_list.html" % tmag_start
-	make_fail_html(mfailed_stars, os.path.join(outdir, failed_star_file))
-
-
-	mag_fail = dict(n_stars=len(mag_range_acqs),
-			n_failed=len(np.flatnonzero(mag_range_acqs.obc_id == 'NOID')),			
+        
+        mag_fail_acqs = mag_range_acqs[ mag_range_acqs.obc_id == 'NOID' ]
+        for mfail in mag_fail_acqs:
+            star=dict(id=mfail.agasc_id,
+                      obsid=mfail.obsid,
+                      mag_exp=mfail.mag,
+                      mag_obs=mfail.mag_obs,
+                      acq_stat='NOID')
+            mfailed_stars.append(star)
+        failed_star_file = "failed_acq_%.1f_stars_list.html" % tmag_start
+        make_fail_html(mfailed_stars, os.path.join(outdir, failed_star_file))
+        
+        mag_fail = dict(n_stars=len(mag_range_acqs),
+                        n_failed=len(
+            np.flatnonzero(mag_range_acqs.obc_id == 'NOID')),			
 		       )
-	if mag_fail['n_stars'] == 0:
-	    mag_fail['fail_rate'] = 0
-	else:
-	    mag_fail['fail_rate'] = mag_fail['n_failed']*1.0/mag_fail['n_stars']
-	mag_fail['label'] = "%0.1f-%0.1f" % (tmag_start,tmag_start+bin)
-	mag_fail['fail_file'] = failed_star_file
-	fails.append(mag_fail)
-
+        if mag_fail['n_stars'] == 0:
+            mag_fail['fail_rate'] = 0
+        else:
+            mag_fail['fail_rate'] = mag_fail['n_failed']*1.0/mag_fail['n_stars']
+        mag_fail['label'] = "%0.1f-%0.1f" % (tmag_start,tmag_start+bin)
+        mag_fail['fail_file'] = failed_star_file
+        fails.append(mag_fail)
 
 
     return fails
@@ -409,11 +443,11 @@ def acq_fails( acqs, tname, mxdatestart, mxdatestop,
 def main(opt):
     """
     Update acquisition statistics plots.  Mission averages are computed with all stars
-    from 2003:001 to the end of the interval.
+    from 2000:001 to the end of the interval.
     """
     
     sqlaca = Ska.DBI.DBI(dbi='sybase', server='sybase', numpy=True)
-    min_acq_time = DateTime('2003:001:00:00:00.000')
+    min_acq_time = DateTime('2000:001:00:00:00.000')
 
     all_acq = sqlaca.fetchall('select * from acq_stats_data where tstart >= %f'
                               % min_acq_time.secs )
@@ -423,73 +457,80 @@ def main(opt):
     all_id = sqlaca.fetchall('select * from acq_stats_id_by_obsid where tstart >= %f' % 
                              min_acq_time.secs )
 
-    to_update = Ska.report_ranges.get_update_ranges(opt.days_back)
+    if opt.start_time is None:
+        to_update = Ska.report_ranges.get_update_ranges(opt.days_back)
+    else:
+        import time
+        now = DateTime(time.time(), format='unix').mxDateTime
+        start = DateTime(opt.start_time).mxDateTime
+        delta = now - start
+        to_update = Ska.report_ranges.get_update_ranges(int(delta.days))
+        
 
     for tname in sorted(to_update.keys()):
-
         logger.debug("Attempting to update %s" % tname )
-        try:
-		mxdatestart = to_update[tname]['start']
-		mxdatestop = to_update[tname]['stop']
+        mxdatestart = to_update[tname]['start']
+        mxdatestop = to_update[tname]['stop']
 
-		# ignore acquisition stars that are newer than the end of the range
-		# in question (happens during reprocessing) for consistency
-		all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
-		all_id_upto = all_id[ all_id.tstart <= DateTime(mxdatestop).secs ]
+        # ignore acquisition stars that are newer than the end of the range
+        # in question (happens during reprocessing) for consistency
+        all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
+        all_id_upto = all_id[ all_id.tstart <= DateTime(mxdatestop).secs ]
 
-		webout = os.path.join(opt.webdir,
-				      "%s" % to_update[tname]['year'],
-				      to_update[tname]['subid'])
-		if not os.path.exists(webout):
-			os.makedirs(webout)
+        webout = os.path.join(opt.webdir,
+                              "%s" % to_update[tname]['year'],
+                              to_update[tname]['subid'])
+        if not os.path.exists(webout):
+            os.makedirs(webout)
+        dataout = os.path.join(opt.datadir,
+                               "%s" % to_update[tname]['year'],
+                               to_update[tname]['subid'])
+        if not os.path.exists(dataout):
+            os.makedirs(dataout)
 
-		dataout = os.path.join(opt.datadir,
-				       "%s" % to_update[tname]['year'],
-				       to_update[tname]['subid'])
+        logger.debug("Plots and HTML to %s" % webout)
+        logger.debug("JSON to  %s" % dataout)
 
-		if not os.path.exists(dataout):
-			os.makedirs(dataout)
+        rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop)
 
-		logger.debug("Plots and HTML to %s" % webout)
-		logger.debug("JSON to  %s" % dataout)
+        import json
+        rep_file = open(os.path.join(dataout, 'rep.json'), 'w')
+        rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
+        rep_file.close()
 
-		rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop)
+        fails = acq_fails(all_acq_upto,
+                          tname,
+                          mxdatestart,
+                          mxdatestop,
+                          outdir=webout)
+        fail_file = open(os.path.join(dataout, 'fail.json'), 'w')
+        fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
+        fail_file.close()
 
-		import json
-		rep_file = open(os.path.join(dataout, 'rep.json'), 'w')
-		rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
-		rep_file.close()
+        prev_range = Ska.report_ranges.get_prev(to_update[tname])
+        next_range = Ska.report_ranges.get_next(to_update[tname])
+        nav = dict(main=opt.url,
+                   next="%s/%s/%s/%s" % (opt.url,
+                                         next_range['year'],
+                                         next_range['subid'],
+                                         'index.html'),
+                   prev="%s/%s/%s/%s" % (opt.url,
+                                         prev_range['year'],
+                                         prev_range['subid'],
+                                         'index.html'),
+                   )
 
-		fails = acq_fails(all_acq_upto, tname, mxdatestart, mxdatestop, outdir=webout)
-		fail_file = open(os.path.join(dataout, 'fail.json'), 'w')
-		fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
-		fail_file.close()
-
-		prev_range = Ska.report_ranges.get_prev(to_update[tname])
-		next_range = Ska.report_ranges.get_next(to_update[tname])
-		nav = dict(main=opt.url,
-			   next="%s/%s/%s/%s" % (opt.url,
-						 next_range['year'],
-						 next_range['subid'],
-						 'index.html'),
-			   prev="%s/%s/%s/%s" % (opt.url,
-						 prev_range['year'],
-						 prev_range['subid'],
-						 'index.html'),
-			   )
-
-		make_acq_plots( all_acq_upto,
-				tstart=DateTime(mxdatestart).secs,
-				tstop=DateTime(mxdatestop).secs,
-				outdir=webout)
-		make_id_plots( all_id_upto,
-				   tstart=DateTime(mxdatestart).secs,
-			       tstop=DateTime(mxdatestop).secs,
-			       outdir=webout)
-
-		make_html(nav, rep, fails, outdir=webout)
-	except Exception, msg:
-	    print "ERROR: Unable to process %s" % tname, msg
+        make_acq_plots( all_acq_upto,
+                        tstart=DateTime(mxdatestart).secs,
+                        tstop=DateTime(mxdatestop).secs,
+                        outdir=webout)
+        make_id_plots( all_id_upto,
+                       tstart=DateTime(mxdatestart).secs,
+                       tstop=DateTime(mxdatestop).secs,
+                       outdir=webout)
+        make_html(nav, rep, fails, outdir=webout)
+        #except Exception, msg:
+	    #print "ERROR: Unable to process %s" % tname, msg
 	
 
 
