@@ -19,24 +19,8 @@ from glob import glob
 import json
 from Chandra.Time import DateTime
 import sherpa.ui as ui
+import Ska.report_ranges
 
-
-trend_start = 270691265.18
-trend_mxd = DateTime(trend_start).mxDateTime
-trend_start_frac = trend_mxd.year + trend_mxd.day_of_year * 1.0 / 365
-now = DateTime().mxDateTime
-now_frac = now.year + now.day_of_year * 1 / 365
-
-csec_year = 86400 * 365.25
-
-import pickle
-fit = pickle.load(open('fitfile.pkl'))
-parnames = np.array(fit.parnames)
-parvals = np.array(fit.parvals)
-b_name = 'ypoly.c0'
-m_name = 'ypoly.c1'
-b = parvals[ parnames == b_name ][0]
-m = parvals[ parnames == m_name ][0]
 
 time_pad = .1
 
@@ -47,15 +31,18 @@ data = { 'month': glob(os.path.join(datadir, '????', 'M??', 'rep.json')),
          'semi': glob(os.path.join(datadir, '????', 'S?', 'rep.json')),
          'year': glob(os.path.join(datadir, '????', 'YEAR', 'rep.json')),}
 
-#trend_start = 2006.8
 
-rates = dict([(ttype, dict([ (ftype, dict(time=np.array([]),
-                                          rate=np.array([]),
-                                          err_h=np.array([]),
-                                          err_l=np.array([])))
+pred = json.load(open('acq_fail_fitfile.json'))
+
+rates = dict([(ttype, dict([ (ftype, dict(time=[],
+                                          rate=[],
+                                          err_h=[],
+                                          err_l=[]))
                              for ftype in ['fail',]]))
               for ttype in data.keys()])
 
+now_mxd = DateTime().mxDateTime
+now_frac = now_mxd.year + now_mxd.day_of_year / 365.25
 
 for d in data.keys():
 
@@ -67,39 +54,18 @@ for d in data.keys():
         ftype='fail'
         mxd = DateTime( (DateTime(rep['datestart']).secs
                          +  DateTime(rep['datestop']).secs) / 2).mxDateTime
-        frac_year = mxd.day_of_year * 1.0 / 365
-        rates[d][ftype]['time'] = np.append(rates[d][ftype]['time'],
-                                         mxd.year + frac_year)
-        #DateTime(rep['datestart']).secs)
-        rates[d][ftype]['rate'] = np.append(rates[d][ftype]['rate'],
-                                         rep['fail_rate'])
-        rates[d][ftype]['err_h'] = np.append(rates[d][ftype]['err_h'],
-                                          rep['fail_rate_err_high'])
-        rates[d][ftype]['err_l'] = np.append(rates[d][ftype]['err_l'],
-                                          rep['fail_rate_err_low'])
+        frac_year = mxd.day_of_year / 365.25
+        rates[d][ftype]['time'].append(mxd.year + frac_year)
+        rates[d][ftype]['rate'].append(rep['fail_rate'])
+        rates[d][ftype]['err_h'].append(rep['fail_rate_err_high'])
+        rates[d][ftype]['err_l'].append(rep['fail_rate_err_low'])
         curr_color='black'
         #ptime = DateTime(rep['datestart']).secs
         
+    for rkey in rates[d][ftype]:
+        rates[d][ftype][rkey] = np.array(rates[d][ftype][rkey])
 
-#    if d == 'quarter':
-#        time_ok = rates[d]['fail']['time'] > trend_start
-#        data_id = 0
-#        ui.set_method('simplex')
-#        ui.load_arrays(data_id,
-#                       rates[d]['fail']['time'][time_ok] - trend_start,
-#                       rates[d]['fail']['rate'][time_ok])
-#        ui.set_staterror(data_id,
-#                         np.max([rates[d]['fail']['err_h'][time_ok],
-#                                 rates[d]['fail']['err_l'][time_ok]], axis=0))
-#        ui.polynom1d.ypoly
-#        ui.set_model(data_id, 'ypoly')
-#        ui.thaw(ypoly.c0)
-#        ui.thaw(ypoly.c1)
-#        ui.fit(data_id)
-#        myfit = ui.get_fit_results()
-#        axplot = ui.get_model_plot(data_id)
-#        
-#
+
 for d in data.keys():
 
     fig1 = plt.figure(1,figsize=(5,3))
@@ -124,16 +90,13 @@ for d in data.keys():
                  markersize=5)
 
 
-#    #fig3= plt.figure(figsize=(5,3))
+
+    # plot prediction for trending start through a year from now
     for ax in [ax1, ax2]:
-        #plot_cxctime(rates['fail']['time'],
-        #             rates['fail']['rate'], ax=ax, fmt='b.')
-        #ax.plot([axplot.x[0], axplot.x[-1]],
-        #             [axplot.y[0], axplot.y[-1]], color='red' )
-        ax.plot( [trend_start_frac,
-                  now_frac],
-                 [ b,
-                   m * (now_frac - trend_start_frac) + b],
+        ax.plot( [pred['time0'],
+                  now_frac + 1],
+                 [ pred['b'],
+                   pred['m'] * (now_frac + 1 - pred['time0']) + pred['b']],
                  'r-')
     ax1.set_ylim(ax2.get_ylim())
 
@@ -155,7 +118,6 @@ for d in data.keys():
     fig2.savefig("summary_%s_acq_fail_eb.png" % d)
     plt.close(fig1)
     plt.close(fig2)
-
 
 
 
