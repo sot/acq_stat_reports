@@ -23,10 +23,11 @@ from Chandra.Time import DateTime
 # local to project
 import Ska.Matplotlib
 import Ska.report_ranges
-
+from star_error import high_low_rate
 
 task = 'acq_stat_reports'
 TASK_SHARE = os.path.join(os.environ['SKA'],'share', task)
+TASK_DATA = os.path.join(os.environ['SKA'],'data', task)
 #TASK_SHARE = "."
 
 jinja_env = jinja2.Environment(
@@ -35,19 +36,6 @@ jinja_env = jinja2.Environment(
 logger = logging.getLogger(task)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(message)s')
-
-# cheated and grabbed 95% confidence intervals from http://statpages.org/confint.html
-ppois_conf = { 0 : [ 0, 3.6899 ],
-               1 : [ .0253, 5.5716 ],
-               2 : [ .2422, 7.2247 ],
-               3 : [ .6187, 8.7673 ],
-               4 : [ 1.0899, 10.2416 ],
-               5 : [ 1.6235, 11.6683 ],
-               6 : [ 2.2019, 13.0595 ],
-               7 : [ 2.8144, 14.4277 ],
-               8 : [ 3.4538, 15.7632 ],
-               9 : [ 4.1154, 17.0848 ],
-               10 : [ 4.7954, 18.3904]} 
 
 
 def get_options():
@@ -220,6 +208,7 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.xlabel('Star magnitude (mag)')
     plt.ylabel('Fraction of All Acq Stars')
     plt.title('Expected Magnitudes of Acquisition Stars')
+    plt.ylim(0,1.0)
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'exp_mag_histogram.png'))
 
@@ -308,8 +297,7 @@ class NoStarError(Exception):
     def __str__(self):
         return repr(self.value)
 
-def acq_info( acqs, tname, mxdatestart, mxdatestop,
-	      pred_start='2000:001:00:00:00.000' ):
+def acq_info( acqs, tname, mxdatestart, mxdatestop, pred):
     """
     Generate a report dictionary for the time range.
 
@@ -332,8 +320,8 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop,
 
     range_acqs = acqs[ (acqs.tstart >= DateTime(mxdatestart).secs)
 		       & (acqs.tstart < DateTime(mxdatestop).secs) ]
-    pred_acqs =  acqs[ (acqs.tstart >= DateTime(pred_start).secs)
-		       & (acqs.tstart < DateTime(mxdatestop).secs) ]
+    #pred_acqs =  acqs[ (acqs.tstart >= DateTime(pred_start).secs)
+	#	       & (acqs.tstart < DateTime(mxdatestop).secs) ]
 
     rep['n_stars'] = len(range_acqs)
     if not len(range_acqs):
@@ -341,9 +329,9 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop,
     rep['n_failed'] = len(np.flatnonzero(range_acqs.obc_id == 'NOID'))
     rep['fail_rate'] = 1.0*rep['n_failed']/rep['n_stars']
 
-    rep['fail_rate_pred'] = ( len(np.flatnonzero(pred_acqs.obc_id == 'NOID'))
-                              *1.0
-                              / len(pred_acqs))
+    mean_time = (DateTime(rep['datestart']).secs + DateTime(rep['datestop']).secs) / 2.0
+    mean_time_d_year = (mean_time - pred['time0']) / (86400 * 365.25)
+    rep['fail_rate_pred'] = mean_time_d_year * pred['m'] + pred['b']
     rep['n_failed_pred'] = int(round(rep['fail_rate_pred'] * rep['n_stars']))
 
 
@@ -351,18 +339,8 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop,
     rep['prob_more'] = 1 - scipy.stats.poisson.cdf( rep['n_failed'] - 1,
 						    rep['n_failed_pred'] )
 
-    # use Poisson confidence if number small
-    if rep['n_failed'] <= 10:
-        low_conf = ppois_conf[rep['n_failed']][0]
-        high_conf = ppois_conf[rep['n_failed']][1]
-        rep['fail_rate_err_low'] = rep['fail_rate'] - (low_conf/(rep['n_stars']*1.0))
-        rep['fail_rate_err_high'] = (high_conf/(rep['n_stars']*1.0)) - rep['fail_rate']
-    else:
-        rep['fail_rate_err_low'] = np.sqrt(rep['n_failed'])/(rep['n_stars']*1.0)
-        rep['fail_rate_err_high'] = rep['fail_rate_err_low']
-    # I don't think the high err limits are necessary on this data set, but
-    if rep['fail_rate_err_high'] + rep['fail_rate'] > 1:
-        rep['fail_rate_err_high'] = 1 - rep['fail_rate']                                
+    rep['fail_rate_err_high'], rep['fail_rate_err_low'] = high_low_rate( rep['n_failed'],
+                                                                         rep['n_stars'])
 
     return rep
 
@@ -380,8 +358,7 @@ def make_fail_html( stars, outfile):
 
 
 
-def acq_fails( acqs, tname, mxdatestart, mxdatestop,
-	      pred_start='2000:001:00:00:00.000', outdir='out'):
+def acq_fails( acqs, tname, mxdatestart, mxdatestop, outdir='out'):
     """
     Find the failures over the interval and find the tail mag failures.
     Pass the failures to make_fail_html for the main star table and the
@@ -446,7 +423,7 @@ def main(opt):
     from 2000:001 to the end of the interval.
     """
     
-    sqlaca = Ska.DBI.DBI(dbi='sybase', server='sybase', numpy=True)
+    sqlaca = Ska.DBI.DBI(dbi='sybase', server='sybase', user='aca_read', database='aca', numpy=True)
     min_acq_time = DateTime('2000:001:00:00:00.000')
 
     all_acq = sqlaca.fetchall('select * from acq_stats_data where tstart >= %f'
@@ -491,9 +468,11 @@ def main(opt):
         logger.debug("Plots and HTML to %s" % webout)
         logger.debug("JSON to  %s" % dataout)
 
-        rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop)
 
         import json
+        pred = json.load(open(os.path.join(TASK_DATA, 'acq_fail_fitfile.json')))
+        rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop, pred)
+
         rep_file = open(os.path.join(dataout, 'rep.json'), 'w')
         rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
         rep_file.close()

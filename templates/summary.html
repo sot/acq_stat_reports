@@ -1,0 +1,25 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <title>Acq Stats Summaries</title>
+    <link href="/mta/ASPECT/aspect.css" rel="stylesheet" type="text/css" media="all" />
+  </head>
+
+  <body>
+<!--#include virtual="/mta/ASPECT/header.html"-->
+<H1>Acquisition Failures</H1>
+<TABLE>
+<TR><TH>No Error bars</TH><TH>Error bars<TH></TR>
+{% for t in ['month', 'quarter', 'semi', 'year'] %}
+<TR><TD><IMG SRC="summary_{{ t }}_fail_rate.png"></TD>
+<TD><IMG SRC="summary_{{ t }}_fail_rate_eb.png"></TD></TR>
+{% endfor %}
+</TABLE>
+    
+<!--#include virtual="/mta/ASPECT/footer.html"--> 
+<!--footer end-->
+
+  </body>
+</html>
+
+
