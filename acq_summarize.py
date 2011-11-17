@@ -20,7 +20,9 @@ if __name__ == '__main__':
 import mx.DateTime
 from Chandra.Time import DateTime
 
-
+import time
+nowdate = time.ctime()
+print "---------- acq stat reports summary update at %s ----------" % (nowdate)
 
 task = 'acq_stat_reports'
 TASK_SHARE = os.path.join(os.environ['SKA'],'share', task)
@@ -156,3 +158,4 @@ f = open(outfile, 'w')
 f.write(page)
 f.close()
                 
+print "---------- acq stat reports summary update complete ----------" 

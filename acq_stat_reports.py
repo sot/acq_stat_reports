@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import logging
 
+
 # Matplotlib setup
 # Use Agg backend for command-line (non-interactive) operation
 import matplotlib
@@ -422,6 +423,10 @@ def main(opt):
     Update acquisition statistics plots.  Mission averages are computed with all stars
     from 2000:001 to the end of the interval.
     """
+
+    import time
+    nowdate = time.ctime()
+    logger.info("---------- acq stat reports update at %s ----------" % (nowdate))
     
     sqlaca = Ska.DBI.DBI(dbi='sybase', server='sybase', user='aca_read', database='aca', numpy=True)
     min_acq_time = DateTime('2000:001:00:00:00.000')
