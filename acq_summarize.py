@@ -14,7 +14,7 @@ import jinja2
 import matplotlib
 if __name__ == '__main__':
         matplotlib.use('Agg')
-        import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 
 import mx.DateTime
@@ -36,7 +36,7 @@ datadir = os.path.join(os.environ['SKA'], 'data', task)
 #datadir = os.path.join('/proj/sot/ska', 'data' , task )
 plotdir = os.path.join(os.environ['SKA'], 'www', 'ASPECT', task, 'summary')
 
-time_pad = .1
+time_pad = .05
 
 data = { 'month': glob(os.path.join(datadir, '????', 'M??', 'rep.json')),
          'quarter': glob(os.path.join(datadir, '????', 'Q?', 'rep.json')),
@@ -121,15 +121,13 @@ for d in data.keys():
 
         ax2_ylim = ax2.get_ylim()
         # pad a bit below 0 relative to ylim range
-        ax2.set_ylim(ax2_ylim[0] - 0.05*(ax2_ylim[1] - ax2_ylim[0]))
+        ax2.set_ylim(ax2_ylim[0] - 0.025*(ax2_ylim[1] - ax2_ylim[0]))
         ax1.set_ylim(ax2.get_ylim())
         
         for ax in [ax1, ax2]:
-            curr_xlims = ax.get_xlim()
-            dxlim = curr_xlims[1]-curr_xlims[0]
-            ax.set_xlim(curr_xlims[0]-time_pad*dxlim,
-                        curr_xlims[1]+time_pad*dxlim)
-            
+            dxlim = now_frac - 2000
+            ax.set_xlim(2000,
+                        now_frac + time_pad * dxlim)
             #    ax = fig.get_axes()[0]
             labels = ax.get_xticklabels() + ax.get_yticklabels()
             for label in labels:
