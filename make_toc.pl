@@ -111,8 +111,6 @@ for my $typestring qw( Month Quarter Semi Year ){
 	$toc .= qq{ <TD>$monthname{$month}</TD> }
     }
     $toc .= qq{</TR> \n};
-    $toc .= qq{<TR>};
-
 
     for my $year ( $year_start ... $exist_dirs{year_dir}->[-1] ){
 	$toc .= qq{<TR><TD>$year</TD>};
