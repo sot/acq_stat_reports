@@ -17,6 +17,7 @@ if __name__ == '__main__':
 
 import jinja2
 import scipy.stats
+from astropy.table import Table, join
 
 import Ska.DBI
 from Chandra.Time import DateTime
@@ -223,56 +224,23 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.savefig(os.path.join(outdir, 'delta_mag_scatter.png'))
     plt.close(h)
 
-
-def make_id_plots( ids, tstart=0, tstop=DateTime().secs, outdir="plots"):
-    """Make acquisition statistics plots related to IDs by obsid
-    id_per_obsid_histogram.png
-    id_per_obsid_mission_histogram.png
-
-    :param ids: all mission ids by obsid recarray from Ska.DBI.fetchall
-    :param tstart: range of interest tstart (Chandra secs)
-    :param tstop: range of interest tstop (Chandra secs)
-    :param outdir: output directory for pngs
-    :rtype: None
-    
-    """
-    
-
-    if not os.path.exists(outdir):
-        os.makedirs(outdir)
-
-    # range N ids per obsid
-    id_by_obsid = ids[ (ids.tstart >= tstart) & (ids.tstart < tstop ) ]
-
-    figsize=(5,2.5)
-    h=plt.figure(figsize=figsize)
-    plt.hist(id_by_obsid.id_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='black')
-    plt.hist(id_by_obsid.noid_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='red')
-    ylims = plt.ylim()
-    plt.ylim(.1,ylims[1]*2)
-    plt.xlim(-1,9)
-    plt.xlabel('Number of Acq Stars (red=NOID)')
-    plt.ylabel('Number of obsids')
-    plt.title('ID Acq Stars per obsid (Interval)')
-    plt.subplots_adjust(top=.85, bottom=.17, right=.97)
-    plt.savefig(os.path.join(outdir, 'id_per_obsid_histogram.png'))
+    long_acqs = Table(acqs[acqs['tstart'] > (DateTime() - 2 * 365).secs][['obsid', 'obc_id', 'tstart']])
+    acqs_id = long_acqs[long_acqs['obc_id'] == 'ID']
+    gacqs = acqs_id.group_by('obsid')
+    n_acqs = gacqs.groups.aggregate(np.size)
+    del n_acqs['tstart']
+    t_acqs = gacqs.groups.aggregate(np.mean)
+    out = join(n_acqs, t_acqs, keys='obsid')
+    h = plt.figure(figsize=(10, 2.5))
+    Ska.Matplotlib.plot_cxctime(out['tstart'], out['obc_id'], '.')
+    plt.grid()
+    plt.ylim(0,9)
+    plt.margins(0.05)
+    plt.ylabel('Identified acq stars')
+    plt.tight_layout()
+    plt.savefig(os.path.join(outdir, 'id_acq_stars.png'))
     plt.close(h)
 
-    # N ids per obsid over mission
-    id_by_obsid_all = ids
-
-    h=plt.figure(figsize=figsize)
-    plt.hist(id_by_obsid_all.id_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='black')
-    plt.hist(id_by_obsid_all.noid_cnt, bins=np.arange(-.5,9,1), log=True, histtype='step',color='red')
-    ylims = plt.ylim()
-    plt.ylim(.1,ylims[1]*2)
-    plt.xlim(-1,9)
-    plt.xlabel('Number of Acq Stars (red=NOID)')
-    plt.ylabel('Number of obsids')
-    plt.title('ID Acq Stars per obsid (Mission)')
-    plt.subplots_adjust(top=.85, bottom=.17, right=.97)
-    plt.savefig(os.path.join(outdir, 'id_per_obsid_mission_histogram.png'))
-    plt.close(h)
 
 def make_html( nav_dict, rep_dict, fail_dict, outdir):
     """
@@ -434,11 +402,6 @@ def main(opt):
     all_acq = sqlaca.fetchall('select * from acq_stats_data where tstart >= %f'
                               % min_acq_time.secs )
 
-    # use the acq_stats_id_by_obsid view for a quick count of the number of ID/NOID
-    # stars in each obsid.  Used by make_id_plots()
-    all_id = sqlaca.fetchall('select * from acq_stats_id_by_obsid where tstart >= %f' % 
-                             min_acq_time.secs )
-
     if opt.start_time is None:
         to_update = Ska.report_ranges.get_update_ranges(opt.days_back)
     else:
@@ -457,7 +420,6 @@ def main(opt):
         # ignore acquisition stars that are newer than the end of the range
         # in question (happens during reprocessing) for consistency
         all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
-        all_id_upto = all_id[ all_id.tstart <= DateTime(mxdatestop).secs ]
 
         webout = os.path.join(opt.webdir,
                               "%s" % to_update[tname]['year'],
@@ -508,10 +470,6 @@ def main(opt):
                         tstart=DateTime(mxdatestart).secs,
                         tstop=DateTime(mxdatestop).secs,
                         outdir=webout)
-        make_id_plots( all_id_upto,
-                       tstart=DateTime(mxdatestart).secs,
-                       tstop=DateTime(mxdatestop).secs,
-                       outdir=webout)
         make_html(nav, rep, fails, outdir=webout)
         #except Exception, msg:
 	    #print "ERROR: Unable to process %s" % tname, msg
