@@ -228,7 +228,12 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     acqs_id = long_acqs[long_acqs['obc_id'] == 'ID']
     gacqs = acqs_id.group_by('obsid')
     n_acqs = gacqs.groups.aggregate(np.size)
+    # Delete bogus column from table meant to count id stars
     del n_acqs['tstart']
+    # Delete obc_id column from source table because it doesn't
+    # aggregate (for t(ime)_acqs) and isn't necessary now that we
+    # have the counts in n_acqs
+    del gacqs['obc_id']
     t_acqs = gacqs.groups.aggregate(np.mean)
     out = join(n_acqs, t_acqs, keys='obsid')
     h = plt.figure(figsize=(10, 2.5))
