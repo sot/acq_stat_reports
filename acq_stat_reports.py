@@ -220,6 +220,7 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.xlabel('AGASC magnitude (mag)')
     plt.ylabel('Observed - AGASC mag')
     plt.title('Delta Mag vs Mag')
+    plt.grid(True)
     plt.subplots_adjust(top=.85, bottom=.17, right=.97)
     plt.savefig(os.path.join(outdir, 'delta_mag_scatter.png'))
     plt.close(h)
