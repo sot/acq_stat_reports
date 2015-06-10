@@ -225,7 +225,7 @@ def make_acq_plots( acqs, tstart=0, tstop=DateTime().secs, outdir="plots"):
     plt.savefig(os.path.join(outdir, 'delta_mag_scatter.png'))
     plt.close(h)
 
-    long_acqs = Table(acqs[acqs['tstart'] > (DateTime() - 2 * 365).secs][['obsid', 'obc_id', 'tstart']])
+    long_acqs = Table(acqs[acqs['tstart'] > (DateTime() - 2 * 365).secs])[['obsid', 'obc_id', 'tstart']]
     acqs_id = long_acqs[long_acqs['obc_id'] == 'ID']
     gacqs = acqs_id.group_by('obsid')
     n_acqs = gacqs.groups.aggregate(np.size)
