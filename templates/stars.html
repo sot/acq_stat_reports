@@ -11,7 +11,11 @@
 <TD ALIGN="right">
 <A HREF="{{ nav.starcheck_cgi }}{{ star.obsid }}">{{ star.obsid }}</A></TD>
 <TD ALIGN="right">{{ "%.2f"|format(star.mag_exp) }}</TD>
+{% if star.mag_obs is none %}
+<TD ALIGN="right"></TD>
+{% else %}
 <TD ALIGN="right">{{ "%.2f"|format(star.mag_obs) }}</TD>
+{% endif %}
 <TD ALIGN="right">{{ star.acq_stat }}</TD>
 </TR>
 {% endfor %}
