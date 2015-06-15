@@ -17,7 +17,6 @@ if __name__ == '__main__':
 import matplotlib.pyplot as plt
 
 
-import mx.DateTime
 from Chandra.Time import DateTime
 
 import time
@@ -63,11 +62,11 @@ for d in data.keys():
         rep_text = rep_file.read()
         rep = json.loads(rep_text)
         for ftype in rates.keys():
-            mxd = DateTime( (DateTime(rep['datestart']).secs
-                             +  DateTime(rep['datestop']).secs) / 2).mxDateTime
-            frac_year = mxd.day_of_year * 1.0 / 365
+            datetime = DateTime((DateTime(rep['datestart']).secs
+                                 +  DateTime(rep['datestop']).secs) / 2)
+            frac_year = datetime.frac_year
             rates[ftype]['time'] = np.append(rates[ftype]['time'],
-                                                mxd.year + frac_year) 
+                                             frac_year)
             for ftype in ['fail_rate']:
                 rates[ftype]['rate'] = np.append(rates[ftype]['rate'],
                                                  rep['fail_rate'])
@@ -106,12 +105,11 @@ for d in data.keys():
         #fit_file = open(os.path.join(datadir, "%s_fitfile.json" % ftype), 'r')
         fit_text = fit_file.read()
         fit = json.loads(fit_text)
-        trend_s_mxd = DateTime(fit['datestart']).mxDateTime
-        trend_start_frac = trend_s_mxd.year + (trend_s_mxd.day_of_year * 1.0 / 365)
+        trend_time = DateTime(fit['datestart'])
+        trend_start_frac = trend_time.frac_year
         m = fit['m']
         b = fit['b']
-        now_mxd = DateTime().mxDateTime
-        now_frac = now_mxd.year + (now_mxd.day_of_year * 1.0 / 365)
+        now_frac = DateTime().frac_year
         for ax in [ax1, ax2]:
             ax.plot( [trend_start_frac,
                       now_frac + 1],

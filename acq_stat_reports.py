@@ -272,14 +272,14 @@ class NoStarError(Exception):
     def __str__(self):
         return repr(self.value)
 
-def acq_info( acqs, tname, mxdatestart, mxdatestop, pred):
+def acq_info( acqs, tname, range_datestart, range_datestop, pred):
     """
     Generate a report dictionary for the time range.
 
     :param acqs: recarray of all acquisition stars available in the table
     :param tname: timerange string (e.g. 2010-M05)
-    :param mxdatestart: mx.DateTime of start of reporting interval
-    :param mxdatestop: mxDateTime of end of reporting interval
+    :param range_datestart: Chandra.DateTime of start of reporting interval
+    :param range_datestop: Chandra.DateTime of end of reporting interval
     :param pred_start: date for beginning of time range for predictions based
     on average from pred_start to now()
 
@@ -287,14 +287,20 @@ def acq_info( acqs, tname, mxdatestart, mxdatestop, pred):
     """
 	
     rep = { 'datestring' : tname,
-	    'datestart' : DateTime(mxdatestart).date,
-	    'datestop' : DateTime(mxdatestop).date,
-	    'human_date_start' : mxdatestart.strftime("%d-%B-%Y"),
-	    'human_date_stop' : mxdatestop.strftime("%d-%B-%Y"),
+	    'datestart' : DateTime(range_datestart).date,
+	    'datestop' : DateTime(range_datestop).date,
+	    'human_date_start' : "{}-{}-{}".format(
+                    range_datestart.caldate[0:4],
+                    range_datestart.caldate[4:7],
+                    range_datestart.caldate[7:9]),
+	    'human_date_stop' : "{}-{}-{}".format(
+                    range_datestop.caldate[0:4],
+                    range_datestop.caldate[4:7],
+                    range_datestop.caldate[7:9])
 	    }
 
-    range_acqs = acqs[ (acqs.tstart >= DateTime(mxdatestart).secs)
-		       & (acqs.tstart < DateTime(mxdatestop).secs) ]
+    range_acqs = acqs[ (acqs.tstart >= DateTime(range_datestart).secs)
+		       & (acqs.tstart < DateTime(range_datestop).secs) ]
     #pred_acqs =  acqs[ (acqs.tstart >= DateTime(pred_start).secs)
 	#	       & (acqs.tstart < DateTime(mxdatestop).secs) ]
 
@@ -333,7 +339,7 @@ def make_fail_html( stars, outfile):
 
 
 
-def acq_fails( acqs, tname, mxdatestart, mxdatestop, outdir='out'):
+def acq_fails( acqs, tname, range_datestart, range_datestop, outdir='out'):
     """
     Find the failures over the interval and find the tail mag failures.
     Pass the failures to make_fail_html for the main star table and the
@@ -341,8 +347,8 @@ def acq_fails( acqs, tname, mxdatestart, mxdatestop, outdir='out'):
     """
 
     fails = []
-    range_acqs = acqs[ (acqs.tstart >= DateTime(mxdatestart).secs)
-		       & (acqs.tstart < DateTime(mxdatestop).secs) ]
+    range_acqs = acqs[ (acqs.tstart >= DateTime(range_datestart).secs)
+		       & (acqs.tstart < DateTime(range_datestop).secs) ]
 
     all_fails = range_acqs[ range_acqs.obc_id == 'NOID' ]
     failed_stars = []
@@ -411,21 +417,20 @@ def main(opt):
     if opt.start_time is None:
         to_update = Ska.report_ranges.get_update_ranges(opt.days_back)
     else:
-        import time
-        now = DateTime(time.time(), format='unix').mxDateTime
-        start = DateTime(opt.start_time).mxDateTime
+        now = DateTime()
+        start = DateTime(opt.start_time)
         delta = now - start
-        to_update = Ska.report_ranges.get_update_ranges(int(delta.days))
+        to_update = Ska.report_ranges.get_update_ranges(int(delta))
         
 
     for tname in sorted(to_update.keys()):
         logger.debug("Attempting to update %s" % tname )
-        mxdatestart = to_update[tname]['start']
-        mxdatestop = to_update[tname]['stop']
+        range_datestart = to_update[tname]['start']
+        range_datestop = to_update[tname]['stop']
 
         # ignore acquisition stars that are newer than the end of the range
         # in question (happens during reprocessing) for consistency
-        all_acq_upto = all_acq[ all_acq.tstart <= DateTime(mxdatestop).secs ]
+        all_acq_upto = all_acq[ all_acq.tstart <= DateTime(range_datestop).secs ]
 
         webout = os.path.join(opt.webdir,
                               "%s" % to_update[tname]['year'],
@@ -444,7 +449,7 @@ def main(opt):
 
         import json
         pred = json.load(open(os.path.join(TASK_DATA, 'acq_fail_fitfile.json')))
-        rep = acq_info(all_acq_upto, tname, mxdatestart, mxdatestop, pred)
+        rep = acq_info(all_acq_upto, tname, range_datestart, range_datestop, pred)
 
         rep_file = open(os.path.join(dataout, 'rep.json'), 'w')
         rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
@@ -452,8 +457,8 @@ def main(opt):
 
         fails = acq_fails(all_acq_upto,
                           tname,
-                          mxdatestart,
-                          mxdatestop,
+                          range_datestart,
+                          range_datestop,
                           outdir=webout)
         fail_file = open(os.path.join(dataout, 'fail.json'), 'w')
         fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
@@ -473,8 +478,8 @@ def main(opt):
                    )
 
         make_acq_plots( all_acq_upto,
-                        tstart=DateTime(mxdatestart).secs,
-                        tstop=DateTime(mxdatestop).secs,
+                        tstart=DateTime(range_datestart).secs,
+                        tstop=DateTime(range_datestop).secs,
                         outdir=webout)
         make_html(nav, rep, fails, outdir=webout)
         #except Exception, msg:
