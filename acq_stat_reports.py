@@ -425,8 +425,8 @@ def main(opt):
 
     for tname in sorted(to_update.keys()):
         logger.debug("Attempting to update %s" % tname )
-        range_datestart = to_update[tname]['start']
-        range_datestop = to_update[tname]['stop']
+        range_datestart = DateTime(to_update[tname]['start'])
+        range_datestop = DateTime(to_update[tname]['stop'])
 
         # ignore acquisition stars that are newer than the end of the range
         # in question (happens during reprocessing) for consistency
@@ -478,8 +478,8 @@ def main(opt):
                    )
 
         make_acq_plots( all_acq_upto,
-                        tstart=DateTime(range_datestart).secs,
-                        tstop=DateTime(range_datestop).secs,
+                        tstart=range_datestart.secs,
+                        tstop=range_datestop.secs,
                         outdir=webout)
         make_html(nav, rep, fails, outdir=webout)
         #except Exception, msg:
