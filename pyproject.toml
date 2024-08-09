@@ -17,4 +17,5 @@ Homepage = "https://github.com/sot/acq_stat_reports"
 
 [project.scripts]
 acq-stat-reports = "acq_stat_reports.acq_stat_reports:main"
+acq-stat-reports-toc = "acq_stat_reports.toc:main"
 
