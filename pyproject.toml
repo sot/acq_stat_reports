@@ -1,0 +1,19 @@
+[project]
+name = "acq_stat_reports"
+dynamic = ["version"]
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["acq_stats_reports"]  # package names should match these glob patterns (["*"] by default)
+
+[build-system]
+requires = ["setuptools", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+
+[project.urls]
+Homepage = "https://github.com/sot/acq_stat_reports"
+
+[project.scripts]
+acq-stats-reports = "acq_stat_reports.acq_stats_reports:main"
