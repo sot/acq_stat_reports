@@ -4,7 +4,7 @@ dynamic = ["version"]
 dependencies = []
 
 [tool.setuptools.packages.find]
-include = ["acq_stats_reports"]  # package names should match these glob patterns (["*"] by default)
+include = ["acq_stat_reports"]  # package names should match these glob patterns (["*"] by default)
 
 [build-system]
 requires = ["setuptools", "setuptools_scm"]
