@@ -15,7 +15,7 @@ import ska_matplotlib
 import ska_report_ranges
 from astropy import units as u
 from astropy.table import Table, join
-from chandra_aca.star_probs import binomial_uncertainty_interval
+from chandra_aca.star_probs import binomial_confidence_interval
 from cxotime import CxoTime
 from ska_helpers import logging
 
@@ -376,7 +376,7 @@ def acq_info(acqs, tname, range_datestart, range_datestop):
         rep["n_failed"] - 1, rep["n_failed_pred"]
     )
 
-    r, low, high = binomial_uncertainty_interval(rep["n_failed"], rep["n_stars"])
+    r, low, high = binomial_confidence_interval(rep["n_failed"], rep["n_stars"])
     rep["fail_rate_err_high"], rep["fail_rate_err_low"] = high - r, r - low
 
     return rep
