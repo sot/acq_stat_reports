@@ -541,6 +541,7 @@ def main():
             tstart=range_datestart.secs,
             tstop=range_datestop.secs,
             outdir=webout,
+            close_figures=True,
         )
         make_html(nav, rep, fails, outdir=webout)
 
