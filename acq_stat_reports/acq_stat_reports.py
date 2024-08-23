@@ -323,7 +323,6 @@ def make_html(nav_dict, rep_dict, fail_dict, outdir):
     contains the elements required for the extra table of failures at the
     bottom of the page, and outdir is the destination directory.
     """
-    print(JINJA_ENV.list_templates())
     template = JINJA_ENV.get_template("index.html")
     page = template.render(nav=nav_dict, fails=fail_dict, rep=rep_dict)
     with open(outdir / "index.html", "w") as fh:
