@@ -143,20 +143,8 @@ def main():  # noqa: PLR0915
                 markersize=5,
             )
             ax2.grid()
-            with open(args.datadir / "acq_fail_fitfile.json", "r") as fit_file:
-                fit_text = fit_file.read()
-            fit = json.loads(fit_text)
-            trend_time = CxoTime(fit["datestart"])
-            trend_start_frac = trend_time.frac_year
-            m = fit["m"]
-            b = fit["b"]
+
             now_frac = CxoTime().frac_year
-            for ax in [ax1, ax2]:
-                ax.plot(
-                    [trend_start_frac, now_frac + 1],
-                    [b, m * ((now_frac + 1) - trend_start_frac) + b],
-                    "r-",
-                )
 
             ax2_ylim = ax2.get_ylim()
             # pad a bit below 0 relative to ylim range
