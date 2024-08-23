@@ -448,7 +448,7 @@ def acq_fails(acqs, range_datestart, range_datestop, outdir="out"):  #  noqa: AR
         else:
             mag_fail["fail_rate"] = mag_fail["n_failed"] * 1.0 / mag_fail["n_stars"]
         mag_fail["label"] = "%0.1f-%0.1f" % (tmag_start, tmag_start + bin)
-        mag_fail["fail_file"] = str(failed_star_file)
+        mag_fail["fail_file"] = failed_star_file.name
         fails.append(mag_fail)
 
     return fails
