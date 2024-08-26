@@ -1,0 +1,128 @@
+ <html>
+    <head>
+        <TITLE>Acquisition Statistics Reports</TITLE>
+        <link href="/mta/ASPECT/aspect.css" rel="stylesheet" type="text/css" media="all" />
+        <style type="text/css">
+        body { min-width:900px; background:url('http://cxc.harvard.edu/mta/ASPECT/blue_paper.gif');  }
+        </style>
+    </head>
+    <body>
+    <H3>Acquisition Statistics Reports</H3>
+    
+    
+    <H4>Summary Reports</H4>
+    <A href="./summary/acq_summary.html">Summary Index</A>
+
+    <H4>Individual Reports</H4>
+
+    <p>Monthly Data</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <td></td>
+                <td>Jan</td> <td>Feb</td> <td>Mar</td> <td>Apr</td> <td>May</td> <td>Jun</td>
+                <td>Jul</td> <td>Aug</td> <td>Sep</td> <td>Oct</td> <td>Nov</td> <td>Dec</td>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for row in monthly_data %}
+            <tr>
+                <td> {{ row[0][3] }} </td>
+                {%- for cell in row %}
+                <td align=center colspan={{ cell[0] }}>
+                    {% if cell[1] %}
+                    <a href="{{ cell[1] }}/index.html"> {{  cell[2] }} </a>
+                    {% else %} &nbsp; {% endif %}
+                </td>
+                {%- endfor %}
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+
+    <p>Quarterly Data</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <td></td>
+                <td>Jan</td> <td>Feb</td> <td>Mar</td> <td>Apr</td> <td>May</td> <td>Jun</td>
+                <td>Jul</td> <td>Aug</td> <td>Sep</td> <td>Oct</td> <td>Nov</td> <td>Dec</td>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for row in quarterly_data %}
+            <tr>
+                <td> {{ row[0][3] }} </td>
+                {%- for cell in row %}
+                <td align=center colspan={{ cell[0] }}>
+                    {% if cell[1] %}
+                    <a href="{{ cell[1] }}/index.html"> {{  cell[2] }} </a>
+                    {% else %} &nbsp; {% endif %}
+                </td>
+                {%- endfor %}
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+
+    <p>Semi-yearly Data</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <td></td>
+                <td>Jan</td> <td>Feb</td> <td>Mar</td> <td>Apr</td> <td>May</td> <td>Jun</td>
+                <td>Jul</td> <td>Aug</td> <td>Sep</td> <td>Oct</td> <td>Nov</td> <td>Dec</td>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for row in semi_data %}
+            <tr>
+                <td> {{ row[0][3] }} </td>
+                {%- for cell in row %}
+                <td align=center colspan={{ cell[0] }}>
+                    {% if cell[1] %}
+                    <a href="{{ cell[1] }}/index.html"> {{  cell[2] }} </a>
+                    {% else %} &nbsp; {% endif %}
+                </td>
+                {%- endfor %}
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+
+    <p>Yearly Data</p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <td></td>
+                <td>Jan</td> <td>Feb</td> <td>Mar</td> <td>Apr</td> <td>May</td> <td>Jun</td>
+                <td>Jul</td> <td>Aug</td> <td>Sep</td> <td>Oct</td> <td>Nov</td> <td>Dec</td>
+            </tr>
+        </thead>
+        <tbody>
+            {%- for row in yearly_data %}
+            <tr>
+                <td> {{ row[0][3] }} </td>
+                {%- for cell in row %}
+                <td align=center colspan={{ cell[0] }}>
+                    {% if cell[1] %}
+                    <a href="{{ cell[1] }}/index.html"> {{ row[0][3] }} </a>
+                    {% else %} &nbsp; {% endif %}
+                </td>
+                {%- endfor %}
+            </tr>
+            {%- endfor %}
+        </tbody>
+    </table>
+
+ </body>
+
+</html>
+
+
+
+

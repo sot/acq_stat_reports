@@ -7,9 +7,9 @@
 {% for star in failed_stars %}
 <TR>
 <TD ALIGN="right">
-<A HREF="{{ nav.star_cgi }}{{ star.id }};">{{ star.id }}</A></TD>
+<A HREF="https://icxc.harvard.edu/cgi-bin/aspect/get_stats/get_stats.cgi?id={{ star.id }};">{{ star.id }}</A></TD>
 <TD ALIGN="right">
-<A HREF="{{ nav.starcheck_cgi }}{{ star.obsid }}">{{ star.obsid }}</A></TD>
+<A HREF="https://icxc.harvard.edu/cgi-bin/aspect/starcheck_print/starcheck_print.cgi?sselect=obsid;obsid1={{ star.obsid }}">{{ star.obsid }}</A></TD>
 <TD ALIGN="right">{{ "%.2f"|format(star.mag_exp) }}</TD>
 {% if star.mag_obs is none %}
 <TD ALIGN="right"></TD>
