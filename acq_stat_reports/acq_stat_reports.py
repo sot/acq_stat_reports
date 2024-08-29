@@ -19,6 +19,8 @@ from chandra_aca.star_probs import binomial_confidence_interval
 from cxotime import CxoTime
 from ska_helpers import logging
 
+from acq_stat_reports.config import OPTIONS
+
 SKA = Path(os.environ["SKA"])
 
 JINJA_ENV = jinja2.Environment(
@@ -38,18 +40,29 @@ def get_parser():
     parser.add_argument(
         "--datadir",
         default=Path(SKA / "data" / "acq_stat_reports"),
-        help="Output directory",
+        help="Output directory (default is $SKA/data/acq_stat_reports)",
         type=Path,
     )
     parser.add_argument(
         "--webdir",
         default=Path(SKA / "www" / "ASPECT" / "acq_stat_reports"),
-        help="Output directory",
+        help="Output directory (default is $SKA/www/ASPECT/acq_stat_reports)",
         type=Path,
     )
-    parser.add_argument("--url", default="/mta/ASPECT/acq_stat_reports/")
-    parser.add_argument("--start_time", default=None)
-    parser.add_argument("--days_back", default=30, type=int)
+    parser.add_argument(
+        "--url",
+        help="URL root of the deployed page (default is /mta/ASPECT/acq_stat_reports/)",
+        default="/mta/ASPECT/acq_stat_reports/",
+    )
+    parser.add_argument(
+        "--start_time", help="Start time (default is NOW)", default=None
+    )
+    parser.add_argument(
+        "--days_back",
+        help="How many days to look back (default is 30)",
+        default=30,
+        type=int,
+    )
     parser.add_argument(
         "-v",
         default="INFO",
@@ -109,7 +122,7 @@ def frac_points(acq, mag_bin, binstart=None):
     return (x, fracs, err_low, err_high)
 
 
-def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False):  # noqa: PLR0912, PLR0915
+def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False):
     """Make acquisition statistics plots.
 
     Make range of acquisition statistics plots:
@@ -134,13 +147,26 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     if outdir is not None and not outdir.exists():
         outdir.mkdir(parents=True)
 
-    figsize = (5, 2.5)
-    tiny_y = 0.1
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
+
+    make_mag_histogram_plot(range_acqs)
+    make_zoom_mag_histogram_plot(range_acqs)
+    make_mag_pointhist_plot(acqs, range_acqs)
+    make_zoom_mag_pointhist_plot(acqs, range_acqs)
+    make_exp_mag_histogram_plot(acqs, range_acqs)
+    make_delta_mag_scatter_plot(range_acqs)
+    make_id_acq_stars_plot(range_acqs, outdir=outdir, close_figures=close_figures)
+
+
+def make_mag_histogram_plot(range_acqs):
+    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
 
     # Scaled Failure Histogram, full mag range
     h = plt.figure(figsize=figsize)
     mag_bin = 0.1
+    tiny_y = 0.1
     good = range_acqs[range_acqs["acqid"] == 1]
     # use unfilled histograms from a scipy example
     (bins, data) = ska_matplotlib.hist_outline(
@@ -163,7 +189,16 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     if close_figures:
         plt.close(h)
 
+
+def make_zoom_mag_histogram_plot(range_acqs):
+    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
+
+    tiny_y = 0.1
+    good = range_acqs[range_acqs["acqid"] == 1]
     # Scaled Failure Histogram, tail mag range
+
     h = plt.figure(figsize=figsize)
     mag_bin = 0.05
     (bins, data) = ska_matplotlib.hist_outline(
@@ -185,6 +220,12 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
         plt.savefig(outdir / "zoom_mag_histogram.png")
     if close_figures:
         plt.close(h)
+
+
+def make_mag_pointhist_plot(acqs, range_acqs):
+    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
 
     # Acquisition Success Fraction, full mag range
     h = plt.figure(figsize=figsize)
@@ -216,6 +257,12 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     if close_figures:
         plt.close(h)
 
+
+def make_zoom_mag_pointhist_plot(acqs, range_acqs):
+    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
+
     # Acquisition Success Fraction, tail mag range
     h = plt.figure(figsize=figsize)
     mag_bin = 0.05
@@ -246,6 +293,13 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     if close_figures:
         plt.close(h)
 
+
+def make_exp_mag_histogram_plot(acqs, range_acqs):
+    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
+
+    mag_bin = 0.05
     h = plt.figure(figsize=figsize)
     plt.hist(
         range_acqs["mag"],
@@ -268,8 +322,16 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
     if outdir:
         plt.savefig(outdir / "exp_mag_histogram.png")
+    if close_figures:
+        plt.close(h)
 
-    plt.figure(figsize=figsize)
+
+def make_delta_mag_scatter_plot(range_acqs):
+    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
+
+    h = plt.figure(figsize=figsize)
     ok = range_acqs["acqid"] == 1
     plt.plot(
         range_acqs[ok]["mag"],
@@ -287,9 +349,14 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     if close_figures:
         plt.close(h)
 
-    long_acqs = Table(acqs[acqs["tstart"] > (CxoTime() - 2 * 365 * u.day).secs])[
-        ["obsid", "acqid", "tstart"]
-    ]
+
+def make_id_acq_stars_plot(range_acqs):
+    outdir = Path(OPTIONS.data_dir)
+    close_figures = OPTIONS.close_figures
+
+    long_acqs = Table(
+        range_acqs[range_acqs["tstart"] > (CxoTime() - 2 * 365 * u.day).secs]
+    )[["obsid", "acqid", "tstart"]]
     acqs_id = long_acqs[long_acqs["acqid"] == 1]
     gacqs = acqs_id.group_by("obsid")
     n_acqs = gacqs.groups.aggregate(np.size)
@@ -535,12 +602,12 @@ def main():
             "prev": f"{args.url}/{prev_range['year']}/{prev_range['subid']}/index.html",
         }
 
+        OPTIONS.data_dir = webout
+        OPTIONS.close_figures = True
         make_acq_plots(
             all_acq_upto,
             tstart=range_datestart.secs,
             tstop=range_datestop.secs,
-            outdir=webout,
-            close_figures=True,
         )
         make_html(nav, rep, fails, outdir=webout)
 
