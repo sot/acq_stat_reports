@@ -153,79 +153,54 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
 
     make_mag_histogram_plot(range_acqs)
-    make_zoom_mag_histogram_plot(range_acqs)
+    make_mag_distribution_plot(range_acqs)
     make_mag_pointhist_plot(acqs, range_acqs)
-    make_zoom_mag_pointhist_plot(acqs, range_acqs)
-    make_exp_mag_histogram_plot(acqs, range_acqs)
     make_delta_mag_scatter_plot(range_acqs)
     make_id_acq_stars_plot(range_acqs, outdir=outdir, close_figures=close_figures)
 
 
-def make_mag_histogram_plot(range_acqs):
+def make_mag_distribution_plot(range_acqs):
     figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
     outdir = Path(OPTIONS.data_dir)
     close_figures = OPTIONS.close_figures
-
-    # Scaled Failure Histogram, full mag range
-    h = plt.figure(figsize=figsize)
     mag_bin = 0.1
-    tiny_y = 0.1
-    good = range_acqs[range_acqs["acqid"] == 1]
-    # use unfilled histograms from a scipy example
-    (bins, data) = ska_matplotlib.hist_outline(
-        good["mag"], bins=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
-    )
-    plt.semilogy(bins, data + tiny_y, "k-")
-    bad = range_acqs[range_acqs["acqid"] == 0]
-
-    (bins, data) = ska_matplotlib.hist_outline(
-        bad["mag"], bins=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
-    )
-    plt.semilogy(bins, 100 * data + tiny_y, "r-")
-    plt.xlabel("Star magnitude (mag)")
-    plt.ylabel("N stars (red is x100)")
-    plt.xlim(5, 12)
-    plt.title("N good (black) and bad (red) stars vs Mag")
-    plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
-    if outdir:
-        plt.savefig(outdir / "mag_histogram.png")
-    if close_figures:
-        plt.close(h)
-
-
-def make_zoom_mag_histogram_plot(range_acqs):
-    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-
-    tiny_y = 0.1
-    good = range_acqs[range_acqs["acqid"] == 1]
-    # Scaled Failure Histogram, tail mag range
 
     h = plt.figure(figsize=figsize)
-    mag_bin = 0.05
-    (bins, data) = ska_matplotlib.hist_outline(
-        good["mag"], bins=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
+    bins = np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
+
+    plt.hist(
+        range_acqs["mag"][range_acqs["acqid"] == 1],
+        bins=bins,
+        histtype="step",
+        color="k",
+        density=True,
+        label="Acquired",
     )
-    plt.semilogy(bins, data + tiny_y, "k-")
-    bad = range_acqs[range_acqs["acqid"] == 0]
-    (bins, data) = ska_matplotlib.hist_outline(
-        bad["mag"], bins=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
+    plt.hist(
+        range_acqs["mag"][range_acqs["acqid"] == 0],
+        bins=bins,
+        histtype="step",
+        color="r",
+        weights=np.full(np.count_nonzero(range_acqs["acqid"] == 0), 100),
+        density=True,
+        label="Not acquired",
     )
-    plt.semilogy(bins, 100 * data + tiny_y, "r-")
-    #    plt.ylim(1,1000)
-    plt.xlim(10, 11)
+
+    plt.title("Star Magnitude Distribution")
     plt.xlabel("Star magnitude (mag)")
-    plt.ylabel("N stars (red is x100)")
-    plt.title("N good (black) and bad (red) stars vs Mag")
+    plt.ylabel(r"# stars/$\Delta mag$")
     plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
+    plt.xlim(5, 12)
+    plt.yscale("linear")
+    plt.legend(loc="best")
+    plt.tight_layout()
     if outdir:
-        plt.savefig(outdir / "zoom_mag_histogram.png")
+        plt.savefig(outdir / "mag_distribution.png")
     if close_figures:
         plt.close(h)
 
 
-def make_mag_pointhist_plot(acqs, range_acqs):
+def make_mag_pointhist_plot(range_acqs):
     figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
     outdir = Path(OPTIONS.data_dir)
     close_figures = OPTIONS.close_figures
@@ -233,22 +208,27 @@ def make_mag_pointhist_plot(acqs, range_acqs):
     # Acquisition Success Fraction, full mag range
     h = plt.figure(figsize=figsize)
     mag_bin = 0.1
-    (x, fracs, err_low, err_high) = frac_points(
-        range_acqs,
-        mag_bin,
-        binstart=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin),
+    bins = np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
+
+    quantiles = get_histogram_quantile_ranges(range_acqs, {"mag": bins})
+
+    sel = quantiles["n"] > 0
+    quantiles["acqid_frac"] = np.zeros(len(quantiles))
+    quantiles["low_frac"] = np.zeros(len(quantiles))
+    quantiles["high_frac"] = np.zeros(len(quantiles))
+    quantiles["acqid_frac"][sel] = quantiles["acqid"][sel] / quantiles["n"][sel]
+    quantiles["low_frac"][sel] = quantiles["low"][sel] / quantiles["n"][sel]
+    quantiles["high_frac"][sel] = quantiles["high"][sel] / quantiles["n"][sel]
+
+    plt.plot(quantiles["mag"], quantiles["acqid_frac"], ".", color="k")
+    plt.fill_between(
+        quantiles["mag"],
+        quantiles["low_frac"],
+        quantiles["high_frac"],
+        color="gray",
+        alpha=0.8,
     )
-    plt.errorbar(
-        x, fracs, yerr=[err_low, err_high], color="black", marker=".", linestyle="None"
-    )
-    (x, fracs, err_low, err_high) = frac_points(
-        acqs,
-        mag_bin,
-        binstart=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin),
-    )
-    plt.errorbar(
-        x, fracs, yerr=[err_low, err_high], color="red", marker=".", linestyle="None"
-    )
+
     plt.xlim(5, 12)
     plt.ylim(-0.05, 1.05)
     plt.xlabel("Star magnitude (mag)")
@@ -261,70 +241,55 @@ def make_mag_pointhist_plot(acqs, range_acqs):
         plt.close(h)
 
 
-def make_zoom_mag_pointhist_plot(acqs, range_acqs):
+def make_mag_histogram_plot(
+    range_acqs,
+    draw_good=True,
+    draw_bad=True,
+    density=True,
+    draw_ranges=True,
+    filename="mag_histogram.png",
+):
     figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
     outdir = Path(OPTIONS.data_dir)
     close_figures = OPTIONS.close_figures
+    mag_bin = 0.1
 
-    # Acquisition Success Fraction, tail mag range
+    # Scaled Failure Histogram, full mag range
     h = plt.figure(figsize=figsize)
-    mag_bin = 0.05
-    (x, fracs, err_low, err_high) = frac_points(
-        range_acqs,
-        mag_bin,
-        binstart=np.arange(10 - (mag_bin / 2), 11 + (mag_bin / 2), mag_bin),
-    )
-    plt.errorbar(
-        x, fracs, yerr=[err_low, err_high], color="black", marker=".", linestyle="None"
-    )
-    (x, fracs, err_low, err_high) = frac_points(
-        acqs,
-        mag_bin,
-        binstart=np.arange(10 - (mag_bin / 2), 11 + (mag_bin / 2), mag_bin),
-    )
-    plt.errorbar(
-        x, fracs, yerr=[err_low, err_high], color="red", marker=".", linestyle="None"
-    )
-    plt.ylim(-0.05, 1.05)
-    plt.xlim(10, 11)
+    bins = np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
+
+    quantiles = get_histogram_quantile_ranges(range_acqs, {"mag": bins})
+    x = np.array([quantiles["mag_low"], quantiles["mag_high"]]).T.flatten()
+    # y = np.array([quantiles["median"], quantiles["median"]]).T.flatten()
+    y1 = np.array([quantiles["low"], quantiles["low"]]).T.flatten()
+    y2 = np.array([quantiles["high"], quantiles["high"]]).T.flatten()
+    n = np.array([quantiles["n"], quantiles["n"]]).T.flatten()
+    acqid = np.array([quantiles["acqid"], quantiles["acqid"]]).T.flatten()
+
+    if draw_good:
+        scale = 1 / (mag_bin * np.sum(acqid)) if density else 1
+        # plt.plot(x, scale * y, "-", color="gray")
+        if draw_ranges:
+            plt.fill_between(x, scale * y1, scale * y2, color="gray", alpha=0.8)
+        plt.plot(x, scale * acqid, "-", color="k")
+
+    if draw_bad:
+        scale = 1 / (mag_bin * np.sum(n - acqid)) if density else 1
+        # plt.plot(x, scale * (n-y), "-", color="orange")
+        if draw_ranges:
+            plt.fill_between(
+                x, scale * (n - y1), scale * (n - y2), color="r", alpha=0.3
+            )
+        plt.plot(x, scale * (n - acqid), "-", color="r")
+
     plt.xlabel("Star magnitude (mag)")
-    plt.ylabel("Fraction Acquired")
-    plt.title("Acquisition Success vs Expected Mag")
-    plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
+    plt.ylabel("N stars")
+    plt.title("N good (black) and bad (red) stars vs Mag")
+    plt.xlim(bins[0], bins[-1])
+    plt.ylim(ymin=0)
+    plt.tight_layout()
     if outdir:
-        plt.savefig(outdir / "zoom_mag_pointhist.png")
-    if close_figures:
-        plt.close(h)
-
-
-def make_exp_mag_histogram_plot(acqs, range_acqs):
-    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-
-    mag_bin = 0.05
-    h = plt.figure(figsize=figsize)
-    plt.hist(
-        range_acqs["mag"],
-        bins=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin),
-        histtype="step",
-        color="black",
-        density=True,
-    )
-    plt.hist(
-        acqs["mag"],
-        bins=np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin),
-        histtype="step",
-        color="red",
-        density=True,
-    )
-    plt.xlabel("Star magnitude (mag)")
-    plt.ylabel("Fraction of All Acq Stars")
-    plt.title("Expected Magnitudes of Acquisition Stars")
-    plt.ylim(0, 1.0)
-    plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
-    if outdir:
-        plt.savefig(outdir / "exp_mag_histogram.png")
+        plt.savefig(outdir / filename)
     if close_figures:
         plt.close(h)
 
