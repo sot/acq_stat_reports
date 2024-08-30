@@ -5,8 +5,10 @@ Generate acquisition statistics report.
 import argparse
 import json
 import os
+import warnings
 from pathlib import Path
 
+import agasc
 import jinja2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +17,7 @@ import ska_matplotlib
 import ska_report_ranges
 from astropy import units as u
 from astropy.table import Table, join
-from chandra_aca.star_probs import binomial_confidence_interval
+from chandra_aca.star_probs import acq_success_prob, binomial_confidence_interval
 from cxotime import CxoTime
 from ska_helpers import logging
 
@@ -538,12 +540,53 @@ def get_data():
             "halfw",
             "ccd_temp",
             "acqid",
+            "known_bad",
         ]
     ].copy()
     all_acq.rename_columns(
         ["mag_aca", "color1", "halfw", "ccd_temp"],
         ["mag", "color", "halfwidth", "t_ccd"],
     )
+
+    # Coerce uint8 columns (which are all actually bool) to bool
+    for col in all_acq.itercols():
+        if col.dtype.type is np.uint8:
+            col.dtype = bool
+
+    # Get latest mag estimates from the AGASC with supplement
+    mags_supp = agasc.get_supplement_table("mags")
+    mags_supp = dict(zip(mags_supp["agasc_id"], mags_supp["mag_aca"], strict=True))
+    all_acq["mag"] = [
+        mags_supp.get(agasc_id, mag_aca)
+        for agasc_id, mag_aca in zip(all_acq["agasc_id"], all_acq["mag"], strict=True)
+    ]
+
+    # Remove known bad stars
+    bad_stars = agasc.get_supplement_table("bad")
+    bad = np.isin(all_acq["agasc_id"], bad_stars["agasc_id"]) | all_acq["known_bad"]
+    if OPTIONS.remove_bad_stars:
+        all_acq = all_acq[~bad]
+    else:
+        all_acq["bad_star"] = bad
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message="\n.*clipping input.*outside that range"
+        )
+        all_acq["p_acq_model"] = acq_success_prob(
+            date=all_acq["tstart"],
+            t_ccd=all_acq["t_ccd"],
+            mag=all_acq["mag"],
+            color=all_acq["color"],
+            spoiler=False,
+            halfwidth=all_acq["halfwidth"],
+        )
+
+        all_acq["p_acq_model"].format = ".3f"
+        all_acq["t_ccd"].format = ".2f"
+        all_acq["mag"].format = ".2f"
+        all_acq["mag_obs"].format = ".2f"
+        all_acq["color"].format = ".2f"
 
     return all_acq
 
