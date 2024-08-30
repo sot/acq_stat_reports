@@ -3,6 +3,7 @@ Generate acquisition statistics report.
 """
 
 import argparse
+import itertools
 import json
 import os
 import warnings
@@ -381,6 +382,117 @@ def make_id_acq_stars_plot(range_acqs):
         plt.savefig(outdir / "id_acq_stars.png")
     if close_figures:
         plt.close(h)
+
+
+def _get_quantiles_(group, n_samples=10000):
+    samples = (
+        np.random.uniform(size=n_samples * len(group)).reshape((-1, len(group)))
+        < group["p_acq_model"][None]
+    )
+    n = np.sum(samples, axis=1)
+    return np.percentile(n, [5, 50, 95])
+
+
+def get_histogram_quantile_ranges(data, bin_edges, n_samples=10000):
+    cols = list(bin_edges)
+    bin_cols = [f"{bin_col}_bin" for bin_col in cols]
+    for bin_col in cols:
+        bin_edges[bin_col] = np.atleast_1d(bin_edges[bin_col])
+        if len(bin_edges[bin_col].shape) != 1:
+            raise ValueError("bin_edges must be a dict of 1D arrays")
+
+    # data = data.copy()
+    bin_edges = bin_edges.copy()
+
+    # for bin_col in cols:
+    #     # no underflow (otherwise I one has to be careful with bin == 0)
+    #     data = data[data[bin_col] > bin_edges[bin_col][0]]
+
+    sizes = [len(b) for b in bin_edges.values()]
+    offsets = {cols[0]: 0}
+    offsets.update({cols[i]: np.prod(sizes[:i]) for i in range(1, len(cols))})
+
+    global_bin_idx = np.zeros(len(data), dtype=int)
+    for bin_col in cols:
+        data[f"{bin_col}_bin"] = np.digitize(data[bin_col], bin_edges[bin_col])
+        global_bin_idx += offsets[bin_col] + data[f"{bin_col}_bin"]
+    data["bin"] = global_bin_idx
+
+    # now this is very inefficient, because we are making a list of all possible combinations of bin
+    # indices. Note that we are iterating over cols in reverse order so that the bin calculation
+    # agrees with the one on the data array.
+    bin_idx = dict(
+        zip(
+            cols[::-1],
+            np.array(
+                list(
+                    zip(
+                        *[
+                            list(j)
+                            for j in itertools.product(
+                                *[range(len(bin_edges[col]) + 1) for col in cols[::-1]]
+                            )
+                        ],
+                        strict=True,
+                    )
+                )
+            ),
+            strict=True,
+        )
+    )
+
+    # bins are the bin edges, and np.digitize returns indices assuming there are (n_bins - 1) bins,
+    # plus the under/overflow bins. That's (n_bins + 1) bins.
+    # for book-keeping, we will create padded arrays with -inf and +inf
+    padded_bins = {
+        col: np.concatenate([[-np.inf], bin_edges[col], [np.inf]]) for col in cols
+    }
+
+    quantiles = Table()
+    quantiles["bin"] = np.arange(len(bin_idx[cols[0]]))
+    for bin_col in cols:
+        j = bin_idx[bin_col]
+        quantiles[f"{bin_col}_bin"] = j
+        quantiles[f"{bin_col}_low"] = padded_bins[bin_col][j]
+        quantiles[f"{bin_col}_high"] = padded_bins[bin_col][j + 1]
+        quantiles[f"{bin_col}"] = (
+            quantiles[f"{bin_col}_low"] + quantiles[f"{bin_col}_high"]
+        ) / 2
+
+    # this is a sanity check that the bin indices as calculated above are correct
+    global_bin_idx = np.zeros(len(quantiles), dtype=int)
+    for bin_col in cols:
+        global_bin_idx += offsets[bin_col] + quantiles[f"{bin_col}_bin"]
+    assert np.all(quantiles["bin"] == global_bin_idx)
+    # end sanity check
+
+    g = data.group_by(bin_cols)
+    assert len(g.groups.indices) < len(quantiles)  # sanity check
+    idx = g[["bin"] + cols].groups.aggregate(np.mean)["bin"].astype(int)
+    mean = g[cols].groups.aggregate(np.mean)
+    n = np.diff(g.groups.indices)
+    acqid = g["acqid"].groups.aggregate(np.count_nonzero)
+    low, median, high = np.vstack(
+        [_get_quantiles_(group, n_samples) for group in g.groups]
+    ).T
+
+    quantiles["low"] = 0
+    quantiles["median"] = 0
+    quantiles["high"] = 0
+    quantiles["n"] = 0
+    quantiles["acqid"] = 0
+
+    quantiles["low"][idx] = low
+    quantiles["median"][idx] = median
+    quantiles["high"][idx] = high
+    quantiles["n"][idx] = n
+    quantiles["acqid"][idx] = acqid
+
+    for col in cols:
+        quantiles[f"{col}_mean"] = np.nan
+        quantiles[f"{col}_mean"][idx] = mean[col]
+        quantiles[f"{col}_delta"] = quantiles[f"{col}_high"] - quantiles[f"{col}_low"]
+    return quantiles
 
 
 def make_html(nav_dict, rep_dict, fail_dict, outdir):
