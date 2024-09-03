@@ -3,7 +3,6 @@ Generate acquisition statistics report.
 """
 
 import argparse
-import itertools
 import json
 import os
 import warnings
@@ -22,6 +21,7 @@ from chandra_aca.star_probs import acq_success_prob, binomial_confidence_interva
 from cxotime import CxoTime
 from ska_helpers import logging
 
+from acq_stat_reports import utils
 from acq_stat_reports.config import OPTIONS
 
 SKA = Path(os.environ["SKA"])
@@ -86,46 +86,7 @@ def get_parser():
     return parser
 
 
-def frac_points(acq, mag_bin, binstart=None):
-    """Calculate the fraction of NOID stars in the bins requested.
-
-    Calculate the fraction of NOID stars in the bins requested, where acq is a recarray
-    of the acq stars, mag_bin is the mag range width of the binning, and binstart is
-    a list of the left start of the bins.
-
-    Return the left edge of the bins (x), the fraction of good acq stars (fracs),
-    the low limit on the error of fracs (err_low), and the high limit on the error
-    of fraces (err_high).  Returns a list of lists.
-    """
-
-    x = []
-    fracs = []
-    err_high = []
-    err_low = []
-
-    for rstart in binstart:
-        x.append(rstart + (mag_bin / 2))
-        range_acq = acq[(acq["mag"] >= rstart) & (acq["mag"] < rstart + mag_bin)]
-        if len(range_acq):
-            good = len(range_acq) - len(np.flatnonzero(range_acq["acqid"] == 0))
-            frac = good / (len(range_acq) * 1.0)
-            fracs.append(frac)
-            err_low_lim = np.sqrt(good) / (len(range_acq) * 1.0)
-            if err_low_lim + frac < 1:
-                err_high_lim = err_low_lim
-            else:
-                err_high_lim = 1 - frac
-            err_high.append(err_high_lim)
-            err_low.append(err_low_lim)
-        else:
-            fracs.append(0)
-            err_high.append(0)
-            err_low.append(0)
-
-    return (x, fracs, err_low, err_high)
-
-
-def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False):
+def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
     """Make acquisition statistics plots.
 
     Make range of acquisition statistics plots:
@@ -152,312 +113,123 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None, close_figures=False)
 
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
 
-    make_mag_histogram_plot(range_acqs)
-    make_mag_distribution_plot(range_acqs)
-    make_mag_pointhist_plot(acqs, range_acqs)
-    make_delta_mag_scatter_plot(range_acqs)
-    make_id_acq_stars_plot(range_acqs, outdir=outdir, close_figures=close_figures)
+    datasets = {
+        "all_acq": range_acqs,
+        "binned_t_ccd": utils.BinnedData(
+            data=range_acqs,
+            bins={"t_ccd": np.linspace(-14, 6, 21)},
+        ),
+        "binned_mag": utils.BinnedData(
+            data=range_acqs,
+            bins={"mag": np.arange(5.5 - (0.1 / 2), 12 + (0.1 / 2), 0.1)},
+        ),
+    }
+
+    functions = {
+        "acq_stars_plot": acq_stars_plot,
+        "mag_scatter_plot": mag_scatter_plot,
+        "utils.binned_data_fraction_plot": utils.binned_data_fraction_plot,
+        "utils.binned_data_plot": utils.binned_data_plot,
+    }
+
+    plot_params = {
+        "acq_stars": {
+            "data": "all_acq",
+            "class": "acq_stars_plot",
+            "parameters": {"filename": "id_acq_stars.png", "figscale": (2, 1)},
+        },
+        "mag_scatter": {
+            "data": "all_acq",
+            "class": "mag_scatter_plot",
+            "parameters": {
+                "filename": "delta_mag_scatter.png",
+            },
+        },
+        "mag_histogram": {
+            "data": "binned_mag",
+            "class": "utils.binned_data_plot",
+            "parameters": {
+                "xlabel": "Star magnitude (mag)",
+                "ylabel": "N stars",
+                "title": "Failed Acquisitions vs Mag",
+                "draw_good": False,
+                "draw_bad": True,
+                "density": False,
+                "draw_ranges": True,
+                "filename": "mag_histogram.png",
+            },
+        },
+        "t_ccd_histogram": {
+            "data": "binned_t_ccd",
+            "class": "utils.binned_data_plot",
+            "parameters": {
+                "xlabel": "T$_{CCD}$",
+                "ylabel": "N stars",
+                "title": "Failed Acquisition vs T$_{CCD}$",
+                "draw_good": False,
+                "draw_bad": True,
+                "density": False,
+                "draw_ranges": True,
+                "filename": "t_ccd_histogram.png",
+            },
+        },
+        "mag_pointhist": {
+            "data": "binned_mag",
+            "class": "utils.binned_data_fraction_plot",
+            "parameters": {
+                "xlabel": "Star magnitude (mag)",
+                "ylabel": "Fraction Acquired",
+                "title": "Acquisition Success vs Mag",
+                "filename": "mag_pointhist.png",
+            },
+        },
+        "t_ccd_pointhist": {
+            "data": "binned_t_ccd",
+            "class": "utils.binned_data_fraction_plot",
+            "parameters": {
+                "xlabel": "T$_{CCD}$",
+                "ylabel": "Fraction Acquired",
+                "title": "Acquisition Success vs T$_{CCD}$",
+                "filename": "t_ccd_pointhist.png",
+            },
+        },
+    }
+
+    for params in plot_params.values():
+        functions[params["class"]](datasets[params["data"]], **params["parameters"])
 
 
-def make_mag_distribution_plot(range_acqs):
-    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-    mag_bin = 0.1
-
-    h = plt.figure(figsize=figsize)
-    bins = np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
-
-    plt.hist(
-        range_acqs["mag"][range_acqs["acqid"] == 1],
-        bins=bins,
-        histtype="step",
-        color="k",
-        density=True,
-        label="Acquired",
-    )
-    plt.hist(
-        range_acqs["mag"][range_acqs["acqid"] == 0],
-        bins=bins,
-        histtype="step",
-        color="r",
-        weights=np.full(np.count_nonzero(range_acqs["acqid"] == 0), 100),
-        density=True,
-        label="Not acquired",
-    )
-
-    plt.title("Star Magnitude Distribution")
-    plt.xlabel("Star magnitude (mag)")
-    plt.ylabel(r"# stars/$\Delta mag$")
-    plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
-    plt.xlim(5, 12)
-    plt.yscale("linear")
-    plt.legend(loc="best")
-    plt.tight_layout()
-    if outdir:
-        plt.savefig(outdir / "mag_distribution.png")
-    if close_figures:
-        plt.close(h)
-
-
-def make_mag_pointhist_plot(range_acqs):
-    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-
-    # Acquisition Success Fraction, full mag range
-    h = plt.figure(figsize=figsize)
-    mag_bin = 0.1
-    bins = np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
-
-    quantiles = get_histogram_quantile_ranges(range_acqs, {"mag": bins})
-
-    sel = quantiles["n"] > 0
-    quantiles["acqid_frac"] = np.zeros(len(quantiles))
-    quantiles["low_frac"] = np.zeros(len(quantiles))
-    quantiles["high_frac"] = np.zeros(len(quantiles))
-    quantiles["acqid_frac"][sel] = quantiles["acqid"][sel] / quantiles["n"][sel]
-    quantiles["low_frac"][sel] = quantiles["low"][sel] / quantiles["n"][sel]
-    quantiles["high_frac"][sel] = quantiles["high"][sel] / quantiles["n"][sel]
-
-    plt.plot(quantiles["mag"], quantiles["acqid_frac"], ".", color="k")
-    plt.fill_between(
-        quantiles["mag"],
-        quantiles["low_frac"],
-        quantiles["high_frac"],
-        color="gray",
-        alpha=0.8,
-    )
-
-    plt.xlim(5, 12)
-    plt.ylim(-0.05, 1.05)
-    plt.xlabel("Star magnitude (mag)")
-    plt.ylabel("Fraction Acquired")
-    plt.title("Acquisition Success vs Expected Mag")
-    plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
-    if outdir:
-        plt.savefig(outdir / "mag_pointhist.png")
-    if close_figures:
-        plt.close(h)
-
-
-def make_mag_histogram_plot(
-    range_acqs,
-    draw_good=True,
-    draw_bad=True,
-    density=True,
-    draw_ranges=True,
-    filename="mag_histogram.png",
-):
-    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-    mag_bin = 0.1
-
-    # Scaled Failure Histogram, full mag range
-    h = plt.figure(figsize=figsize)
-    bins = np.arange(5.5 - (mag_bin / 2), 12 + (mag_bin / 2), mag_bin)
-
-    quantiles = get_histogram_quantile_ranges(range_acqs, {"mag": bins})
-    x = np.array([quantiles["mag_low"], quantiles["mag_high"]]).T.flatten()
-    # y = np.array([quantiles["median"], quantiles["median"]]).T.flatten()
-    y1 = np.array([quantiles["low"], quantiles["low"]]).T.flatten()
-    y2 = np.array([quantiles["high"], quantiles["high"]]).T.flatten()
-    n = np.array([quantiles["n"], quantiles["n"]]).T.flatten()
-    acqid = np.array([quantiles["acqid"], quantiles["acqid"]]).T.flatten()
-
-    if draw_good:
-        scale = 1 / (mag_bin * np.sum(acqid)) if density else 1
-        # plt.plot(x, scale * y, "-", color="gray")
-        if draw_ranges:
-            plt.fill_between(x, scale * y1, scale * y2, color="gray", alpha=0.8)
-        plt.plot(x, scale * acqid, "-", color="k")
-
-    if draw_bad:
-        scale = 1 / (mag_bin * np.sum(n - acqid)) if density else 1
-        # plt.plot(x, scale * (n-y), "-", color="orange")
-        if draw_ranges:
-            plt.fill_between(
-                x, scale * (n - y1), scale * (n - y2), color="r", alpha=0.3
-            )
-        plt.plot(x, scale * (n - acqid), "-", color="r")
-
-    plt.xlabel("Star magnitude (mag)")
-    plt.ylabel("N stars")
-    plt.title("N good (black) and bad (red) stars vs Mag")
-    plt.xlim(bins[0], bins[-1])
-    plt.ylim(ymin=0)
-    plt.tight_layout()
-    if outdir:
-        plt.savefig(outdir / filename)
-    if close_figures:
-        plt.close(h)
-
-
-def make_delta_mag_scatter_plot(range_acqs):
-    figsize = (OPTIONS.figure_width, OPTIONS.figure_height)
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-
-    h = plt.figure(figsize=figsize)
-    ok = range_acqs["acqid"] == 1
+@utils.mpl_plot(
+    xlabel="AGASC magnitude (mag)",
+    ylabel="Observed - AGASC mag",
+    title="Delta Mag vs Mag",
+)
+def mag_scatter_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
+    ok = data["acqid"] == 1
     plt.plot(
-        range_acqs[ok]["mag"],
-        range_acqs[ok]["mag_obs"] - range_acqs[ok]["mag"],
+        data[ok]["mag"],
+        data[ok]["mag_obs"] - data[ok]["mag"],
         "k.",
         markersize=3,
     )
-    plt.xlabel("AGASC magnitude (mag)")
-    plt.ylabel("Observed - AGASC mag")
-    plt.title("Delta Mag vs Mag")
     plt.grid(True)
-    plt.subplots_adjust(top=0.85, bottom=0.17, right=0.97)
-    if outdir:
-        plt.savefig(outdir / "delta_mag_scatter.png")
-    if close_figures:
-        plt.close(h)
 
 
-def make_id_acq_stars_plot(range_acqs):
-    outdir = Path(OPTIONS.data_dir)
-    close_figures = OPTIONS.close_figures
-
-    long_acqs = Table(
-        range_acqs[range_acqs["tstart"] > (CxoTime() - 2 * 365 * u.day).secs]
-    )[["obsid", "acqid", "tstart"]]
+@utils.mpl_plot()
+def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
+    long_acqs = Table(data[data["tstart"] > (CxoTime() - 2 * 365 * u.day).secs])[
+        ["obsid", "acqid", "tstart"]
+    ]
     acqs_id = long_acqs[long_acqs["acqid"] == 1]
     gacqs = acqs_id.group_by("obsid")
-    n_acqs = gacqs.groups.aggregate(np.size)
-    # Delete bogus column from table meant to count id stars
-    del n_acqs["tstart"]
-    # Delete acqid column from source table because it doesn't
-    # aggregate (for t(ime)_acqs) and isn't necessary now that we
-    # have the counts in n_acqs
-    del gacqs["acqid"]
-    t_acqs = gacqs.groups.aggregate(np.mean)
+    n_acqs = gacqs.groups.aggregate(np.size)[["obsid", "acqid"]]
+    t_acqs = gacqs.groups.aggregate(np.mean)[["obsid", "tstart"]]
     out = join(n_acqs, t_acqs, keys="obsid")
-    h = plt.figure(figsize=(10, 2.5))
     ska_matplotlib.plot_cxctime(out["tstart"], out["acqid"], ".")
     plt.grid()
     plt.ylim(0, 9)
     plt.margins(0.05)
     plt.ylabel("Identified acq stars")
-    plt.tight_layout()
-    if outdir:
-        plt.savefig(outdir / "id_acq_stars.png")
-    if close_figures:
-        plt.close(h)
-
-
-def _get_quantiles_(group, n_samples=10000):
-    samples = (
-        np.random.uniform(size=n_samples * len(group)).reshape((-1, len(group)))
-        < group["p_acq_model"][None]
-    )
-    n = np.sum(samples, axis=1)
-    return np.percentile(n, [5, 50, 95])
-
-
-def get_histogram_quantile_ranges(data, bin_edges, n_samples=10000):
-    cols = list(bin_edges)
-    bin_cols = [f"{bin_col}_bin" for bin_col in cols]
-    for bin_col in cols:
-        bin_edges[bin_col] = np.atleast_1d(bin_edges[bin_col])
-        if len(bin_edges[bin_col].shape) != 1:
-            raise ValueError("bin_edges must be a dict of 1D arrays")
-
-    # data = data.copy()
-    bin_edges = bin_edges.copy()
-
-    # for bin_col in cols:
-    #     # no underflow (otherwise I one has to be careful with bin == 0)
-    #     data = data[data[bin_col] > bin_edges[bin_col][0]]
-
-    sizes = [len(b) for b in bin_edges.values()]
-    offsets = {cols[0]: 0}
-    offsets.update({cols[i]: np.prod(sizes[:i]) for i in range(1, len(cols))})
-
-    global_bin_idx = np.zeros(len(data), dtype=int)
-    for bin_col in cols:
-        data[f"{bin_col}_bin"] = np.digitize(data[bin_col], bin_edges[bin_col])
-        global_bin_idx += offsets[bin_col] + data[f"{bin_col}_bin"]
-    data["bin"] = global_bin_idx
-
-    # now this is very inefficient, because we are making a list of all possible combinations of bin
-    # indices. Note that we are iterating over cols in reverse order so that the bin calculation
-    # agrees with the one on the data array.
-    bin_idx = dict(
-        zip(
-            cols[::-1],
-            np.array(
-                list(
-                    zip(
-                        *[
-                            list(j)
-                            for j in itertools.product(
-                                *[range(len(bin_edges[col]) + 1) for col in cols[::-1]]
-                            )
-                        ],
-                        strict=True,
-                    )
-                )
-            ),
-            strict=True,
-        )
-    )
-
-    # bins are the bin edges, and np.digitize returns indices assuming there are (n_bins - 1) bins,
-    # plus the under/overflow bins. That's (n_bins + 1) bins.
-    # for book-keeping, we will create padded arrays with -inf and +inf
-    padded_bins = {
-        col: np.concatenate([[-np.inf], bin_edges[col], [np.inf]]) for col in cols
-    }
-
-    quantiles = Table()
-    quantiles["bin"] = np.arange(len(bin_idx[cols[0]]))
-    for bin_col in cols:
-        j = bin_idx[bin_col]
-        quantiles[f"{bin_col}_bin"] = j
-        quantiles[f"{bin_col}_low"] = padded_bins[bin_col][j]
-        quantiles[f"{bin_col}_high"] = padded_bins[bin_col][j + 1]
-        quantiles[f"{bin_col}"] = (
-            quantiles[f"{bin_col}_low"] + quantiles[f"{bin_col}_high"]
-        ) / 2
-
-    # this is a sanity check that the bin indices as calculated above are correct
-    global_bin_idx = np.zeros(len(quantiles), dtype=int)
-    for bin_col in cols:
-        global_bin_idx += offsets[bin_col] + quantiles[f"{bin_col}_bin"]
-    assert np.all(quantiles["bin"] == global_bin_idx)
-    # end sanity check
-
-    g = data.group_by(bin_cols)
-    assert len(g.groups.indices) < len(quantiles)  # sanity check
-    idx = g[["bin"] + cols].groups.aggregate(np.mean)["bin"].astype(int)
-    mean = g[cols].groups.aggregate(np.mean)
-    n = np.diff(g.groups.indices)
-    acqid = g["acqid"].groups.aggregate(np.count_nonzero)
-    low, median, high = np.vstack(
-        [_get_quantiles_(group, n_samples) for group in g.groups]
-    ).T
-
-    quantiles["low"] = 0
-    quantiles["median"] = 0
-    quantiles["high"] = 0
-    quantiles["n"] = 0
-    quantiles["acqid"] = 0
-
-    quantiles["low"][idx] = low
-    quantiles["median"][idx] = median
-    quantiles["high"][idx] = high
-    quantiles["n"][idx] = n
-    quantiles["acqid"][idx] = acqid
-
-    for col in cols:
-        quantiles[f"{col}_mean"] = np.nan
-        quantiles[f"{col}_mean"][idx] = mean[col]
-        quantiles[f"{col}_delta"] = quantiles[f"{col}_high"] - quantiles[f"{col}_low"]
-    return quantiles
 
 
 def make_html(nav_dict, rep_dict, fail_dict, outdir):
@@ -722,7 +494,7 @@ def main():
             "prev": f"{args.url}/{prev_range['year']}/{prev_range['subid']}/index.html",
         }
 
-        OPTIONS.data_dir = webout
+        OPTIONS.data_dir = str(webout)
         OPTIONS.close_figures = True
         make_acq_plots(
             all_acq_upto,
