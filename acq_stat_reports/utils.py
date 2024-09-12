@@ -8,6 +8,7 @@ import numpy as np
 
 # import numpy.typing as npt
 from astropy.table import Table
+from chandra_aca.star_probs import binomial_confidence_interval
 
 from acq_stat_reports.config import OPTIONS
 
@@ -219,6 +220,40 @@ def binned_data_fraction_plot(
     bins = bins[np.isfinite(bins)]
     plt.xlim(bins[0], bins[-1])
     plt.ylim(-0.05, 1.05)
+
+
+@mpl_plot(
+    title="Acquisition Probability",
+    xlabel="Expected p$_{acq}$",
+    ylabel="Observed p$_{acq}$",
+    figscale=(1, 2),
+)
+def binned_data_probability_plot(
+    binned_data: BinnedData,
+    **kwargs,  # noqa: ARG001 (kwargs is neeeded by the decorator)
+):
+    quantiles = binned_data.binned_data
+
+    sel = quantiles["n"] > 0
+    prob_exp = quantiles["p_acq_model_mean"][sel]
+    prob_obs, low, high = binomial_confidence_interval(
+        quantiles["acqid"][sel], quantiles["n"][sel]
+    )
+
+    plt.gca().set_aspect("equal")
+    plt.errorbar(
+        prob_exp,
+        prob_obs,
+        yerr=[prob_obs - low, high - prob_obs],
+        xerr=quantiles["p_acq_model_std"][sel],
+        fmt=".",
+        color="k",
+        linewidth=1,
+    )
+    x = np.linspace(0, 1, 10)
+    plt.plot(x, x, "k--")
+    plt.ylim(0, 1)
+    plt.xlim(0, 1)
 
 
 def _get_quantiles_(p_acq_model, n_realizations=10000):

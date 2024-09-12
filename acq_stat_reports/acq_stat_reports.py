@@ -115,6 +115,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
 
     datasets = {
         "all_acq": range_acqs,
+        "binned_p_acq": utils.BinnedData(
+            data=range_acqs,
+            bins={"p_acq_model": np.linspace(0, 1, 10)},
+        ),
         "binned_t_ccd": utils.BinnedData(
             data=range_acqs,
             bins={"t_ccd": np.linspace(-14, 6, 21)},
@@ -130,6 +134,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         "mag_scatter_plot": mag_scatter_plot,
         "utils.binned_data_fraction_plot": utils.binned_data_fraction_plot,
         "utils.binned_data_plot": utils.binned_data_plot,
+        "utils.binned_data_probability_plot": utils.binned_data_probability_plot,
     }
 
     plot_params = {
@@ -191,6 +196,13 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
                 "ylabel": "Fraction Acquired",
                 "title": "Acquisition Success vs T$_{CCD}$",
                 "filename": "t_ccd_pointhist.png",
+            },
+        },
+        "prob_scatter": {
+            "data": "binned_p_acq",
+            "class": "utils.binned_data_probability_plot",
+            "parameters": {
+                "filename": "prob_scatter.png",
             },
         },
     }
