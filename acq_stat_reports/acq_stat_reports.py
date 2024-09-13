@@ -463,10 +463,10 @@ def main():
     if args.start_time is None:
         to_update = ska_report_ranges.get_update_ranges(args.days_back)
     else:
-        now = CxoTime()
         start = CxoTime(args.start_time)
-        delta = now - start
-        to_update = ska_report_ranges.get_update_ranges(int(delta))
+        to_update = ska_report_ranges.get_update_ranges(
+            int((now - start).to(u.day).value)
+        )
 
     all_acq = get_data()
 
