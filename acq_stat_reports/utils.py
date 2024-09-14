@@ -395,7 +395,7 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
     # end sanity check
 
     g = data.group_by(bin_cols)
-    assert len(g.groups.indices) < len(quantiles)  # sanity check
+    assert len(g.groups.indices) <= len(quantiles)  # sanity check
     idx = g[["bin"] + cols].groups.aggregate(np.mean)["bin"].astype(int)
     mean = g[cols + extra_cols].groups.aggregate(np.mean)
     std = g[cols + extra_cols].groups.aggregate(np.std)
