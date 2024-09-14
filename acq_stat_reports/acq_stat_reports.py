@@ -112,9 +112,13 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         outdir.mkdir(parents=True)
 
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
+    two_year_acqs = acqs[
+        (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs) & (acqs["tstart"] < tstop)
+    ]
 
     datasets = {
         "all_acq": range_acqs,
+        "two_year_acqs": two_year_acqs,
         "binned_p_acq": utils.BinnedData(
             data=range_acqs,
             bins={"p_acq_model": np.linspace(0, 1, 10)},
@@ -139,7 +143,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
 
     plot_params = {
         "acq_stars": {
-            "data": "all_acq",
+            "data": "two_year_acqs",
             "class": "acq_stars_plot",
             "parameters": {"filename": "id_acq_stars.png", "figscale": (2, 1)},
         },
@@ -229,10 +233,7 @@ def mag_scatter_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the 
 
 @utils.mpl_plot()
 def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
-    long_acqs = Table(data[data["tstart"] > (CxoTime() - 2 * 365 * u.day).secs])[
-        ["obsid", "acqid", "tstart"]
-    ]
-    acqs_id = long_acqs[long_acqs["acqid"] == 1]
+    acqs_id = data[data["acqid"] == 1]
     gacqs = acqs_id.group_by("obsid")
     n_acqs = gacqs.groups.aggregate(np.size)[["obsid", "acqid"]]
     t_acqs = gacqs.groups.aggregate(np.mean)[["obsid", "tstart"]]
