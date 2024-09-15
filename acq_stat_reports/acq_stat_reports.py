@@ -116,6 +116,13 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs) & (acqs["tstart"] < tstop)
     ]
 
+    t_ccd_bins = np.linspace(-14, 6, 21)
+    if tstart < CxoTime("2020:001").cxcsec:
+        # hack to make sure historicall data fits in the range
+        mt = np.mean(range_acqs["t_ccd"])
+        mt = 2 * np.round(mt / 2)
+        t_ccd_bins = np.linspace(mt - 6, mt + 6, 21)
+
     datasets = {
         "all_acq": range_acqs,
         "two_year_acqs": two_year_acqs,
@@ -125,7 +132,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         ),
         "binned_t_ccd": utils.BinnedData(
             data=range_acqs,
-            bins={"t_ccd": np.linspace(-14, 6, 21)},
+            bins={"t_ccd": t_ccd_bins},
         ),
         "binned_mag": utils.BinnedData(
             data=range_acqs,
