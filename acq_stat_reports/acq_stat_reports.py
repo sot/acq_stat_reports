@@ -113,7 +113,8 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
 
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
     two_year_acqs = acqs[
-        (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs) & (acqs["tstart"] < tstop)
+        (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs)
+        & (acqs["tstart"] < tstop)
     ]
 
     t_ccd_bins = np.linspace(-14, 6, 21)
@@ -138,6 +139,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             data=range_acqs,
             bins={"mag": np.arange(5.5 - (0.1 / 2), 12 + (0.1 / 2), 0.1)},
         ),
+        "binned_time": utils.BinnedData(
+            data=two_year_acqs,
+            bins={"tstart": np.arange(tstop, tstop - 2 * 365 * 86400, -86400 * 30)},
+        ),
     }
 
     functions = {
@@ -146,6 +151,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         "utils.binned_data_fraction_plot": utils.binned_data_fraction_plot,
         "utils.binned_data_plot": utils.binned_data_plot,
         "utils.binned_data_probability_plot": utils.binned_data_probability_plot,
+        "expected_fails_plot": expected_fails_plot,
     }
 
     plot_params = {
@@ -153,6 +159,11 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             "data": "two_year_acqs",
             "class": "acq_stars_plot",
             "parameters": {"filename": "id_acq_stars.png", "figscale": (2, 1)},
+        },
+        "expected_fails": {
+            "data": "binned_time",
+            "class": "expected_fails_plot",
+            "parameters": {"filename": "expected_fails_plot.png", "figscale": (2, 1)},
         },
         "mag_scatter": {
             "data": "all_acq",
@@ -236,6 +247,21 @@ def mag_scatter_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the 
         markersize=3,
     )
     plt.grid(True)
+
+
+@utils.mpl_plot(
+    ylabel="Failed Acquisitions",
+    figscale=(2, 1),
+)
+def expected_fails_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
+    d = data.binned_data[np.isfinite(data.binned_data["tstart"])]
+    plt.fill_between(
+        ska_matplotlib.cxctime2plotdate(d["tstart"]),
+        d["n"] - d["high"],
+        d["n"] - d["low"],
+        alpha=0.5
+    )
+    ska_matplotlib.plot_cxctime(d["tstart"], d["n"] - d["acqid"], ".")
 
 
 @utils.mpl_plot()
