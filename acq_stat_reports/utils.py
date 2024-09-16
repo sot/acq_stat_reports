@@ -285,12 +285,20 @@ def _get_quantiles_(p_acq_model, n_realizations=10000):
     return np.percentile(n, [5, 50, 95])
 
 
-def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=10000):  # noqa: PLR0915
+def get_histogram_quantile_ranges(  # noqa: PLR0915
+    data,
+    bin_edges,
+    extra_cols=(),
+    n_samples=10000,
+    success_column="acqid",
+    prob_column="p_acq_model",
+):
     """
     Summarize data in bins and calculate quantiles.
 
-    This function expects a Table with `acqid` and `p_acq_model` columns. The `acqid` column tells
-    whether this sample is a success, and `p_acq_model` is the a-priori probability of success.
+    This function expects a Table with `success_column` and `prob_column` columns. The
+    `success_column` column tells whether this sample is a success, and `prob_column` is the
+    a-priori probability of success.
 
     The function bins the data according to the columns given in `bin_edges`, and creates the
     following columns:
@@ -300,7 +308,7 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
     - `{col}_high`: the upper edge of the bin (repeated for all bin_edges keys)
     - `{col}`: the center of the bin (repeated for all bin_edges keys)
     - `{col}_delta`: the width of the bin (repeated for all bin_edges keys)
-    - `acqid`: the number of "good" samples in the bin
+    - `{success_column}`: the number of "good" samples in the bin
     - `low`: the lower quantile (usually 5%)
     - `median`: the median
     - `high`: the upper quantile (usually 95%)
@@ -310,12 +318,16 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
     Parameters
     ----------
     data : Table
-        The data to summarize. Must include a `p_acq_model` column and the corresponding columns
+        The data to summarize. Must include a `prob_column` column and the corresponding columns
         for the bin edges.
     bin_edges : dict
         A dictionary of bin edges for each column.
     n_samples : int, optional
         The number of realizations to use in the Monte Carlo estimation of the expected successes.
+    success_column: str, optional
+        The name of the column containing the success/failure boolean flag.
+    prob_column: str, optional
+        The name of the column containing the probabilities.
 
     Returns
     -------
@@ -323,6 +335,7 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
         The quantiles of the data in the bins.
     """
     cols = list(bin_edges)
+    extra_cols = list(extra_cols)
     bin_cols = [f"{bin_col}_bin" for bin_col in cols]
     for bin_col in cols:
         bin_edges[bin_col] = np.atleast_1d(bin_edges[bin_col])
@@ -336,14 +349,14 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
     #     # no underflow (otherwise I one has to be careful with bin == 0)
     #     data = data[data[bin_col] > bin_edges[bin_col][0]]
 
-    sizes = [len(b) for b in bin_edges.values()]
-    offsets = {cols[0]: 0}
+    sizes = [len(b) + 1 for b in bin_edges.values()]
+    offsets = {cols[0]: 1}
     offsets.update({cols[i]: np.prod(sizes[:i]) for i in range(1, len(cols))})
 
     global_bin_idx = np.zeros(len(data), dtype=int)
     for bin_col in cols:
         data[f"{bin_col}_bin"] = np.digitize(data[bin_col], bin_edges[bin_col])
-        global_bin_idx += offsets[bin_col] + data[f"{bin_col}_bin"]
+        global_bin_idx += offsets[bin_col] * data[f"{bin_col}_bin"]
     data["bin"] = global_bin_idx
 
     # now this is very inefficient, because we are making a list of all possible combinations of bin
@@ -390,32 +403,32 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
     # this is a sanity check that the bin indices as calculated above are correct
     global_bin_idx = np.zeros(len(quantiles), dtype=int)
     for bin_col in cols:
-        global_bin_idx += offsets[bin_col] + quantiles[f"{bin_col}_bin"]
+        global_bin_idx += offsets[bin_col] * quantiles[f"{bin_col}_bin"]
     assert np.all(quantiles["bin"] == global_bin_idx)
     # end sanity check
 
     g = data.group_by(bin_cols)
-    assert len(g.groups.indices) <= len(quantiles)  # sanity check
+    assert len(g.groups.indices) <= len(quantiles) + 1  # sanity check
     idx = g[["bin"] + cols].groups.aggregate(np.mean)["bin"].astype(int)
     mean = g[cols + extra_cols].groups.aggregate(np.mean)
     std = g[cols + extra_cols].groups.aggregate(np.std)
     n = np.diff(g.groups.indices)
-    acqid = g["acqid"].groups.aggregate(np.count_nonzero)
+    acqid = g[success_column].groups.aggregate(np.count_nonzero)
     low, median, high = np.vstack(
-        [_get_quantiles_(group["p_acq_model"], n_samples) for group in g.groups]
+        [_get_quantiles_(group[prob_column], n_samples) for group in g.groups]
     ).T
 
     quantiles["low"] = 0
     quantiles["median"] = 0
     quantiles["high"] = 0
     quantiles["n"] = 0
-    quantiles["acqid"] = 0
+    quantiles[success_column] = 0
 
     quantiles["low"][idx] = low
     quantiles["median"][idx] = median
     quantiles["high"][idx] = high
     quantiles["n"][idx] = n
-    quantiles["acqid"][idx] = acqid
+    quantiles[success_column][idx] = acqid
 
     for col in cols:
         quantiles[f"{col}_mean"] = np.nan
@@ -428,4 +441,6 @@ def get_histogram_quantile_ranges(data, bin_edges, extra_cols=(), n_samples=1000
         quantiles[f"{col}_mean"][idx] = mean[col]
         quantiles[f"{col}_std"] = np.nan
         quantiles[f"{col}_std"][idx] = std[col]
+
+    quantiles.meta["shape"] = tuple(sizes)[::-1]
     return quantiles
