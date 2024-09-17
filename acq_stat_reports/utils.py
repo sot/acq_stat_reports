@@ -293,7 +293,7 @@ def _get_quantiles_(p_acq_model, n_realizations=10000):
         < p_acq_model[None]
     )
     n = np.sum(samples, axis=1)
-    return np.percentile(n, [5, 50, 95])
+    return np.percentile(n, [15.9, 50, 84.1])
 
 
 def get_histogram_quantile_ranges(  # noqa: PLR0915
