@@ -213,9 +213,20 @@ def binned_data_fraction_plot(
     acqid_frac[sel] = quantiles["acqid"][sel] / quantiles["n"][sel]
     low_frac[sel] = quantiles["low"][sel] / quantiles["n"][sel]
     high_frac[sel] = quantiles["high"][sel] / quantiles["n"][sel]
+    acqid_frac[~sel] = np.nan
+    low_frac[~sel] = np.nan
+    high_frac[~sel] = np.nan
 
     plt.plot(quantiles[col], acqid_frac, ".", color="k")
-    plt.fill_between(quantiles[col], low_frac, high_frac, color="gray", alpha=0.8)
+
+    x = _mpl_hist_steps(
+        quantiles[f"{col}_low"],
+        quantiles[f"{col}_high"],
+    )
+    low = _mpl_hist_steps(low_frac)
+    high = _mpl_hist_steps(high_frac)
+
+    plt.fill_between(x, low, high, color="gray", alpha=0.8)
 
     bins = bins[np.isfinite(bins)]
     plt.xlim(bins[0], bins[-1])
