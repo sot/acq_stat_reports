@@ -151,7 +151,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         "utils.binned_data_fraction_plot": utils.binned_data_fraction_plot,
         "utils.binned_data_plot": utils.binned_data_plot,
         "utils.binned_data_probability_plot": utils.binned_data_probability_plot,
-        "expected_fails_plot": expected_fails_plot,
+        "fail_rate_plot": fail_rate_plot,
     }
 
     plot_params = {
@@ -162,8 +162,8 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         },
         "expected_fails": {
             "data": "binned_time",
-            "class": "expected_fails_plot",
-            "parameters": {"filename": "expected_fails_plot.png", "figscale": (2, 1)},
+            "class": "fail_rate_plot",
+            "parameters": {"filename": "fail_rate_plot.png", "figscale": (2, 1)},
         },
         "mag_scatter": {
             "data": "all_acq",
@@ -250,18 +250,32 @@ def mag_scatter_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the 
 
 
 @utils.mpl_plot(
-    ylabel="Failed Acquisitions",
+    ylabel="Failed Acq. Rate (%)",
     figscale=(2, 1),
 )
-def expected_fails_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
+def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
+    import warnings
+
     d = data.binned_data[np.isfinite(data.binned_data["tstart"])]
-    plt.fill_between(
-        ska_matplotlib.cxctime2plotdate(d["tstart"]),
-        d["n"] - d["high"],
-        d["n"] - d["low"],
-        alpha=0.5
+    sel = (d["n"] != 0)  # rate will only be plotted where n != 0
+    x = utils._mpl_hist_steps(
+        ska_matplotlib.cxctime2plotdate(d["tstart_low"]),
+        ska_matplotlib.cxctime2plotdate(d["tstart_high"]),
     )
-    ska_matplotlib.plot_cxctime(d["tstart"], d["n"] - d["acqid"], ".")
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="divide by zero")
+        warnings.filterwarnings("ignore", message="invalid value encountered in divide")
+        y = np.where(sel, 100 * (d["n"] - d["acqid"]) / d["n"], np.nan)
+        y_high = np.where(sel, 100 * (d["n"] - d["high"]) / d["n"], np.nan)
+        y_low = np.where(sel, 100 * (d["n"] - d["low"]) / d["n"], np.nan)
+
+    plt.fill_between(
+        x,
+        utils._mpl_hist_steps(y_high),
+        utils._mpl_hist_steps(y_low),
+        alpha=0.5,
+    )
+    ska_matplotlib.plot_cxctime(d["tstart"], y, ".")
 
 
 @utils.mpl_plot(
