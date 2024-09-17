@@ -146,7 +146,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         ),
         "binned_mag": utils.BinnedData(
             data=range_acqs,
-            bins={"mag": np.arange(5.5 - (0.1 / 2), 12 + (0.1 / 2), 0.1)},
+            bins={"mag": np.arange(5.5 - (0.2 / 2), 12 + (0.2 / 2), 0.2)},
         ),
         "binned_time": utils.BinnedData(
             data=two_year_acqs,
