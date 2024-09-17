@@ -124,6 +124,11 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         mt = 2 * np.round(mt / 2)
         t_ccd_bins = np.linspace(mt - 6, mt + 6, 21)
 
+    mag_bins = np.concatenate([
+        np.linspace(5.3, 8.3, 16),
+        [8.5, 8.7, 8.9, 9.2, 9.5, 9.8, 10.2, 12]
+    ])
+
     datasets = {
         "all_acq": range_acqs,
         "two_year_acqs": two_year_acqs,
@@ -134,6 +139,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         "binned_t_ccd": utils.BinnedData(
             data=range_acqs,
             bins={"t_ccd": t_ccd_bins},
+        ),
+        "variable_binned_mag": utils.BinnedData(
+            data=range_acqs,
+            bins={"mag": mag_bins},
         ),
         "binned_mag": utils.BinnedData(
             data=range_acqs,
@@ -201,7 +210,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             },
         },
         "mag_pointhist": {
-            "data": "binned_mag",
+            "data": "variable_binned_mag",
             "class": "utils.binned_data_fraction_plot",
             "parameters": {
                 "xlabel": "Star magnitude (mag)",
