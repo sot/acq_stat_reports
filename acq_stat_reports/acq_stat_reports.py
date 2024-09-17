@@ -264,7 +264,9 @@ def expected_fails_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by t
     ska_matplotlib.plot_cxctime(d["tstart"], d["n"] - d["acqid"], ".")
 
 
-@utils.mpl_plot()
+@utils.mpl_plot(
+    ylabel="Identified acq stars",
+)
 def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
     acqs_id = data[data["acqid"] == 1]
     gacqs = acqs_id.group_by("obsid")
@@ -272,10 +274,10 @@ def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     t_acqs = gacqs.groups.aggregate(np.mean)[["obsid", "tstart"]]
     out = join(n_acqs, t_acqs, keys="obsid")
     ska_matplotlib.plot_cxctime(out["tstart"], out["acqid"], ".")
-    plt.grid()
+    plt.yticks([1, 2, 3, 4, 5, 6, 7, 8], minor=True)
+    plt.grid(which="minor", axis="y", color="gray")
+    plt.grid(which="major", axis="x", color="gray")
     plt.ylim(0, 9)
-    plt.margins(0.05)
-    plt.ylabel("Identified acq stars")
 
 
 def make_html(nav_dict, rep_dict, fail_dict, outdir):
