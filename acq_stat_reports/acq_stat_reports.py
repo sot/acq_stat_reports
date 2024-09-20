@@ -285,12 +285,14 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
         utils._mpl_hist_steps(y_2_high),
         utils._mpl_hist_steps(y_2_low),
         alpha=0.25,
+        color="gray",
     )
     plt.fill_between(
         x,
         utils._mpl_hist_steps(y_high),
         utils._mpl_hist_steps(y_low),
         alpha=0.5,
+        color="gray",
     )
     ska_matplotlib.plot_cxctime(d["tstart"], y, ".")
 
