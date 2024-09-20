@@ -128,8 +128,10 @@ def binned_data_plot(binned_data: BinnedData, **kwargs):
 
     quantiles = binned_data.binned_data
     x = _mpl_hist_steps(quantiles[f"{col}_low"], quantiles[f"{col}_high"])
-    y1 = _mpl_hist_steps(quantiles["low"])
-    y2 = _mpl_hist_steps(quantiles["high"])
+    sigma_1_low = _mpl_hist_steps(quantiles["sigma_1_low"])
+    sigma_1_high = _mpl_hist_steps(quantiles["sigma_1_high"])
+    sigma_2_low = _mpl_hist_steps(quantiles["sigma_2_low"])
+    sigma_2_high = _mpl_hist_steps(quantiles["sigma_2_high"])
     n = _mpl_hist_steps(quantiles["n"])
     acqid = _mpl_hist_steps(quantiles["acqid"])
     diff = _mpl_hist_steps(quantiles[f"{col}_delta"])
@@ -139,8 +141,15 @@ def binned_data_plot(binned_data: BinnedData, **kwargs):
         if draw_ranges:
             plt.fill_between(
                 x,
-                scale * y1,
-                scale * y2,
+                scale * sigma_2_low,
+                scale * sigma_2_high,
+                color="gray",
+                alpha=0.3,
+            )
+            plt.fill_between(
+                x,
+                scale * sigma_1_low,
+                scale * sigma_1_high,
                 color="gray",
                 alpha=0.8,
             )
@@ -157,8 +166,15 @@ def binned_data_plot(binned_data: BinnedData, **kwargs):
         if draw_ranges:
             plt.fill_between(
                 x,
-                scale * (n - y1),
-                scale * (n - y2),
+                scale * (n - sigma_2_low),
+                scale * (n - sigma_2_high),
+                color="r",
+                alpha=0.1,
+            )
+            plt.fill_between(
+                x,
+                scale * (n - sigma_1_low),
+                scale * (n - sigma_1_high),
                 color="r",
                 alpha=0.3,
             )
@@ -208,14 +224,20 @@ def binned_data_fraction_plot(
 
     sel = quantiles["n"] > 0
     acqid_frac = np.zeros(len(quantiles))
-    low_frac = np.zeros(len(quantiles))
-    high_frac = np.zeros(len(quantiles))
+    sigma_1_low_frac = np.zeros(len(quantiles))
+    sigma_2_low_frac = np.zeros(len(quantiles))
+    sigma_1_high_frac = np.zeros(len(quantiles))
+    sigma_2_high_frac = np.zeros(len(quantiles))
     acqid_frac[sel] = quantiles["acqid"][sel] / quantiles["n"][sel]
-    low_frac[sel] = quantiles["low"][sel] / quantiles["n"][sel]
-    high_frac[sel] = quantiles["high"][sel] / quantiles["n"][sel]
+    sigma_1_low_frac[sel] = quantiles["sigma_1_low"][sel] / quantiles["n"][sel]
+    sigma_2_low_frac[sel] = quantiles["sigma_2_low"][sel] / quantiles["n"][sel]
+    sigma_1_high_frac[sel] = quantiles["sigma_1_high"][sel] / quantiles["n"][sel]
+    sigma_2_high_frac[sel] = quantiles["sigma_2_high"][sel] / quantiles["n"][sel]
     acqid_frac[~sel] = np.nan
-    low_frac[~sel] = np.nan
-    high_frac[~sel] = np.nan
+    sigma_1_low_frac[~sel] = np.nan
+    sigma_2_low_frac[~sel] = np.nan
+    sigma_1_high_frac[~sel] = np.nan
+    sigma_2_high_frac[~sel] = np.nan
 
     plt.plot(quantiles[col], acqid_frac, ".", color="k")
 
@@ -223,10 +245,13 @@ def binned_data_fraction_plot(
         quantiles[f"{col}_low"],
         quantiles[f"{col}_high"],
     )
-    low = _mpl_hist_steps(low_frac)
-    high = _mpl_hist_steps(high_frac)
+    sigma_1_low = _mpl_hist_steps(sigma_1_low_frac)
+    sigma_2_low = _mpl_hist_steps(sigma_2_low_frac)
+    sigma_1_high = _mpl_hist_steps(sigma_1_high_frac)
+    sigma_2_high = _mpl_hist_steps(sigma_2_high_frac)
 
-    plt.fill_between(x, low, high, color="gray", alpha=0.8)
+    plt.fill_between(x, sigma_1_low, sigma_1_high, color="gray", alpha=0.8)
+    plt.fill_between(x, sigma_2_low, sigma_2_high, color="gray", alpha=0.3)
 
     bins = bins[np.isfinite(bins)]
     plt.xlim(bins[0], bins[-1])
@@ -267,7 +292,7 @@ def binned_data_probability_plot(
     plt.xlim(0, 1)
 
 
-def _get_quantiles_(p_acq_model, n_realizations=10000):
+def _get_quantiles_(p_acq_model, quantiles=None, n_realizations=10000):
     """
     Generate the 5th, 50th, and 95th percentiles of the expected number of successes in a series.
 
@@ -286,6 +311,8 @@ def _get_quantiles_(p_acq_model, n_realizations=10000):
     array-like
         The quantiles
     """
+    if quantiles is None:
+        quantiles = [15.9, 50, 84.1]
     samples = (
         np.random.uniform(size=n_realizations * len(p_acq_model)).reshape(
             (-1, len(p_acq_model))
@@ -293,7 +320,7 @@ def _get_quantiles_(p_acq_model, n_realizations=10000):
         < p_acq_model[None]
     )
     n = np.sum(samples, axis=1)
-    return np.percentile(n, [15.9, 50, 84.1])
+    return np.percentile(n, quantiles)
 
 
 def get_histogram_quantile_ranges(  # noqa: PLR0915
@@ -425,19 +452,30 @@ def get_histogram_quantile_ranges(  # noqa: PLR0915
     std = g[cols + extra_cols].groups.aggregate(np.std)
     n = np.diff(g.groups.indices)
     acqid = g[success_column].groups.aggregate(np.count_nonzero)
-    low, median, high = np.vstack(
-        [_get_quantiles_(group[prob_column], n_samples) for group in g.groups]
+    sigma_2_low, sigma_1_low, median, sigma_1_high, sigma_2_high = np.vstack(
+        [
+            _get_quantiles_(
+                group[prob_column], [[2.27, 15.9, 50, 84.1, 97.7]], n_samples
+            )
+            for group in g.groups
+        ]
     ).T
 
-    quantiles["low"] = 0
+    quantiles["sigma_1_low"] = 0
+    quantiles["sigma_2_low"] = 0
     quantiles["median"] = 0
-    quantiles["high"] = 0
+    quantiles["sigma_1_high"] = 0
+    quantiles["sigma_2_high"] = 0
     quantiles["n"] = 0
     quantiles[success_column] = 0
 
-    quantiles["low"][idx] = low
+    quantiles["sigma_1_low"][idx] = sigma_1_low
+    quantiles["sigma_1_low"][idx] = sigma_1_low
+    quantiles["sigma_2_low"][idx] = sigma_2_low
     quantiles["median"][idx] = median
-    quantiles["high"][idx] = high
+    quantiles["sigma_1_high"][idx] = sigma_1_high
+    quantiles["sigma_1_high"][idx] = sigma_1_high
+    quantiles["sigma_2_high"][idx] = sigma_2_high
     quantiles["n"][idx] = n
     quantiles[success_column][idx] = acqid
 

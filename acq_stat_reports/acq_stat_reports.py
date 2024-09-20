@@ -275,9 +275,17 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
         warnings.filterwarnings("ignore", message="divide by zero")
         warnings.filterwarnings("ignore", message="invalid value encountered in divide")
         y = np.where(sel, 100 * (d["n"] - d["acqid"]) / d["n"], np.nan)
-        y_high = np.where(sel, 100 * (d["n"] - d["high"]) / d["n"], np.nan)
-        y_low = np.where(sel, 100 * (d["n"] - d["low"]) / d["n"], np.nan)
+        y_high = np.where(sel, 100 * (d["n"] - d["sigma_1_high"]) / d["n"], np.nan)
+        y_low = np.where(sel, 100 * (d["n"] - d["sigma_1_low"]) / d["n"], np.nan)
+        y_2_high = np.where(sel, 100 * (d["n"] - d["sigma_2_high"]) / d["n"], np.nan)
+        y_2_low = np.where(sel, 100 * (d["n"] - d["sigma_2_low"]) / d["n"], np.nan)
 
+    plt.fill_between(
+        x,
+        utils._mpl_hist_steps(y_2_high),
+        utils._mpl_hist_steps(y_2_low),
+        alpha=0.25,
+    )
     plt.fill_between(
         x,
         utils._mpl_hist_steps(y_high),
