@@ -10,7 +10,7 @@ import numpy as np
 from astropy.table import Table
 from chandra_aca.star_probs import binomial_confidence_interval
 
-from acq_stat_reports.config import OPTIONS
+from acq_stat_reports.config import conf
 
 
 class BinnedData:
@@ -56,17 +56,17 @@ def mpl_plot(**defaults):
 
             filename = options.pop("filename", None)
             ax = options.pop("ax", None)
-            close_figures = options.pop("close_figures", OPTIONS.close_figures)
+            close_figures = options.pop("close_figures", conf.close_figures)
             figsize = options.pop(
-                "figsize", (OPTIONS.figure_width, OPTIONS.figure_height)
+                "figsize", (conf.figure_width, conf.figure_height)
             )
             figscale = options.pop("figscale", (1, 1))
             figscale, _ = np.broadcast_arrays(figscale, [1, 1])
             figsize = (figsize[0] * figscale[0], figsize[1] * figscale[1])
 
-            outdir = options.pop("outdir", Path(OPTIONS.data_dir))
+            outdir = options.pop("outdir", Path(conf.data_dir))
 
-            with plt.style.context(options.pop("style", OPTIONS.mpl_style)):
+            with plt.style.context(options.pop("style", conf.mpl_style)):
                 if ax is None:
                     fig = plt.figure(figsize=figsize)
 

@@ -22,7 +22,7 @@ from cxotime import CxoTime
 from ska_helpers import logging
 
 from acq_stat_reports import utils
-from acq_stat_reports.config import OPTIONS
+from acq_stat_reports.config import conf
 
 SKA = Path(os.environ["SKA"])
 
@@ -484,7 +484,7 @@ def get_data():
     # Remove known bad stars
     bad_stars = agasc.get_supplement_table("bad")
     bad = np.isin(all_acq["agasc_id"], bad_stars["agasc_id"]) | all_acq["known_bad"]
-    if OPTIONS.remove_bad_stars:
+    if conf.remove_bad_stars:
         all_acq = all_acq[~bad]
     else:
         all_acq["bad_star"] = bad
@@ -565,8 +565,8 @@ def main():
             "prev": f"{args.url}/{prev_range['year']}/{prev_range['subid']}/index.html",
         }
 
-        OPTIONS.data_dir = str(webout)
-        OPTIONS.close_figures = True
+        conf.data_dir = str(webout)
+        conf.close_figures = True
         make_acq_plots(
             all_acq_upto,
             tstart=range_datestart.secs,
