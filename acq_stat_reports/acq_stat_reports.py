@@ -125,7 +125,7 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         t_ccd_bins = np.linspace(mt - 6, mt + 6, 21)
 
     mag_bins = np.concatenate(
-        [np.linspace(5.3, 8.3, 16), [8.5, 8.7, 8.9, 9.2, 9.5, 9.8, 10.2, 12]]
+        [np.linspace(5.3, 8.3, 16), [8.5, 8.7, 8.9, 9.2, 9.5, 9.8, 10.2, 11, 12]]
     )
 
     datasets = {
