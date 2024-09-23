@@ -1,5 +1,3 @@
-
-
 class Config:
     # "Top-level data directory",
     data_dir = "."

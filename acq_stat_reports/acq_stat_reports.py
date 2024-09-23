@@ -124,10 +124,9 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         mt = 2 * np.round(mt / 2)
         t_ccd_bins = np.linspace(mt - 6, mt + 6, 21)
 
-    mag_bins = np.concatenate([
-        np.linspace(5.3, 8.3, 16),
-        [8.5, 8.7, 8.9, 9.2, 9.5, 9.8, 10.2, 12]
-    ])
+    mag_bins = np.concatenate(
+        [np.linspace(5.3, 8.3, 16), [8.5, 8.7, 8.9, 9.2, 9.5, 9.8, 10.2, 12]]
+    )
 
     datasets = {
         "all_acq": range_acqs,
@@ -266,7 +265,7 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     import warnings
 
     d = data.binned_data[np.isfinite(data.binned_data["tstart"])]
-    sel = (d["n"] != 0)  # rate will only be plotted where n != 0
+    sel = d["n"] != 0  # rate will only be plotted where n != 0
     x = utils._mpl_hist_steps(
         ska_matplotlib.cxctime2plotdate(d["tstart_low"]),
         ska_matplotlib.cxctime2plotdate(d["tstart_high"]),

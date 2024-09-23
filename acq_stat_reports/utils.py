@@ -57,9 +57,7 @@ def mpl_plot(**defaults):
             filename = options.pop("filename", None)
             ax = options.pop("ax", None)
             close_figures = options.pop("close_figures", conf.close_figures)
-            figsize = options.pop(
-                "figsize", (conf.figure_width, conf.figure_height)
-            )
+            figsize = options.pop("figsize", (conf.figure_width, conf.figure_height))
             figscale = options.pop("figscale", (1, 1))
             figscale, _ = np.broadcast_arrays(figscale, [1, 1])
             figsize = (figsize[0] * figscale[0], figsize[1] * figscale[1])
