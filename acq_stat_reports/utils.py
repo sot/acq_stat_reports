@@ -1,6 +1,7 @@
 import functools
 import itertools
 from pathlib import Path
+from typing import Any
 
 # from typing import Callable
 import matplotlib.pyplot as plt
@@ -123,6 +124,7 @@ def binned_data_plot(binned_data: BinnedData, **kwargs):
     draw_good = kwargs.get("draw_good", False)
     draw_bad = kwargs.get("draw_bad", False)
     draw_ranges = kwargs.get("draw_ranges", False)
+    draw_legend = kwargs.get("draw_legend", True)
 
     quantiles = binned_data.binned_data
     x = _mpl_hist_steps(quantiles[f"{col}_low"], quantiles[f"{col}_high"])
@@ -134,59 +136,81 @@ def binned_data_plot(binned_data: BinnedData, **kwargs):
     acqid = _mpl_hist_steps(quantiles["acqid"])
     diff = _mpl_hist_steps(quantiles[f"{col}_delta"])
 
+    labels: dict[Any, str] = {}
     if draw_good and np.any(binned_data.data["acqid"]):
         scale = 1 / (diff * np.sum(quantiles["acqid"])) if density else 1
         if draw_ranges:
-            plt.fill_between(
+            sigma_band_2 = plt.fill_between(
                 x,
                 scale * sigma_2_low,
                 scale * sigma_2_high,
                 color="gray",
                 alpha=0.3,
             )
-            plt.fill_between(
+            sigma_band_1 = plt.fill_between(
                 x,
                 scale * sigma_1_low,
                 scale * sigma_1_high,
                 color="gray",
                 alpha=0.8,
             )
-        plt.plot(
+            labels.update(
+                {
+                    sigma_band_1: "68.2% range",
+                    sigma_band_2: "95.4% range",
+                }
+            )
+        (scatter,) = plt.plot(
             x,
             scale * acqid,
             "-",
             color="k",
             label="Acquired",
         )
+        labels[scatter] = "Acquired"
 
     if draw_bad and np.any(~binned_data.data["acqid"]):
         scale = 1 / (diff * np.sum(n - acqid)) if density else 1
         if draw_ranges:
-            plt.fill_between(
+            sigma_band_1 = plt.fill_between(
                 x,
                 scale * (n - sigma_2_low),
                 scale * (n - sigma_2_high),
                 color="r",
                 alpha=0.1,
             )
-            plt.fill_between(
+            sigma_band_2 = plt.fill_between(
                 x,
                 scale * (n - sigma_1_low),
                 scale * (n - sigma_1_high),
                 color="r",
                 alpha=0.3,
             )
-        plt.plot(
+            labels.update(
+                {
+                    sigma_band_1: "68.2% range",
+                    sigma_band_2: "95.4% range",
+                }
+            )
+        (scatter,) = plt.plot(
             x,
             scale * (n - acqid),
             "-",
             color="r",
             label="Not Acquired",
         )
+        labels[scatter] = "Not Acquired"
 
     bins = bins[np.isfinite(bins)]
     plt.xlim(bins[0], bins[-1])
     plt.ylim(ymin=0)
+
+    if draw_legend:
+        plt.legend(
+            labels.keys(),
+            labels.values(),
+            loc="best",
+        )
 
 
 @mpl_plot()
@@ -237,7 +261,7 @@ def binned_data_fraction_plot(
     sigma_1_high_frac[~sel] = np.nan
     sigma_2_high_frac[~sel] = np.nan
 
-    plt.plot(quantiles[col], acqid_frac, ".", color="k")
+    (scatter,) = plt.plot(quantiles[col], acqid_frac, ".", color="k")
 
     x = _mpl_hist_steps(
         quantiles[f"{col}_low"],
@@ -248,12 +272,27 @@ def binned_data_fraction_plot(
     sigma_1_high = _mpl_hist_steps(sigma_1_high_frac)
     sigma_2_high = _mpl_hist_steps(sigma_2_high_frac)
 
-    plt.fill_between(x, sigma_1_low, sigma_1_high, color="gray", alpha=0.8)
-    plt.fill_between(x, sigma_2_low, sigma_2_high, color="gray", alpha=0.3)
+    sigma_band_1 = plt.fill_between(
+        x, sigma_1_low, sigma_1_high, color="gray", alpha=0.8
+    )
+    sigma_band_2 = plt.fill_between(
+        x, sigma_2_low, sigma_2_high, color="gray", alpha=0.3
+    )
 
     bins = bins[np.isfinite(bins)]
     plt.xlim(bins[0], bins[-1])
     plt.ylim(-0.05, 1.05)
+
+    labels = {
+        scatter: "Observed",
+        sigma_band_1: "68.2% range",
+        sigma_band_2: "95.4% range",
+    }
+    plt.legend(
+        labels.keys(),
+        labels.values(),
+        loc="best",
+    )
 
 
 @mpl_plot(

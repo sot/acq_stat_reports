@@ -279,14 +279,14 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
         y_2_high = np.where(sel, 100 * (d["n"] - d["sigma_2_high"]) / d["n"], np.nan)
         y_2_low = np.where(sel, 100 * (d["n"] - d["sigma_2_low"]) / d["n"], np.nan)
 
-    plt.fill_between(
+    sigma_band_2 = plt.fill_between(
         x,
         utils._mpl_hist_steps(y_2_high),
         utils._mpl_hist_steps(y_2_low),
         alpha=0.25,
         color="gray",
     )
-    plt.fill_between(
+    sigma_band_1 = plt.fill_between(
         x,
         utils._mpl_hist_steps(y_high),
         utils._mpl_hist_steps(y_low),
@@ -294,6 +294,12 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
         color="gray",
     )
     ska_matplotlib.plot_cxctime(d["tstart"], y, ".")
+
+    plt.legend(
+        [sigma_band_1, sigma_band_2],
+        ["68.2% range", "95.4% range"],
+        loc="best",
+    )
 
 
 @utils.mpl_plot(
