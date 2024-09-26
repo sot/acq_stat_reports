@@ -525,6 +525,10 @@ def get_data():
 
 
 def main():
+    import matplotlib
+
+    matplotlib.use("agg")
+
     args = get_parser().parse_args()
 
     logger.setLevel(args.v.upper())
