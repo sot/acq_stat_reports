@@ -262,8 +262,6 @@ def mag_scatter_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the 
     figscale=(2, 1),
 )
 def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the decorator)
-    import warnings
-
     d = data.binned_data[np.isfinite(data.binned_data["tstart"])]
     sel = d["n"] != 0  # rate will only be plotted where n != 0
     x = utils._mpl_hist_steps(
