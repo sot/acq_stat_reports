@@ -105,8 +105,10 @@ def binned_data_plot(binned_data: BinnedData, **kwargs):
     - `{col}_delta`: the width of the bin
     - `n`: the number of samples in the bin
     - `acqid`: the number of "good" samples in the bin
-    - `low`: the lower quantile (usually 5%)
-    - `high`: the upper quantile (usually 95%)
+    - `sigma_1_low`: the lower 1-sigma quantile (usually 15.9%)
+    - `sigma_1_high`: the upper 1-sigma quantile (usually 84.1%)
+    - `sigma_2_low`: the lower 2-sigma quantile (usually 2.27%)
+    - `sigma_2_high`: the upper 2-sigma quantile (usually 97.7%)
 
     Optional arguments:
 
@@ -231,8 +233,10 @@ def binned_data_fraction_plot(
     - `{col}_delta`: the width of the bin
     - `n`: the number of samples in the bin
     - `acqid`: the number of "good" samples in the bin
-    - `low`: the lower quantile (usually 5%)
-    - `high`: the upper quantile (usually 95%)
+    - `sigma_1_low`: the lower 1-sigma quantile (usually 15.9%)
+    - `sigma_1_high`: the upper 1-sigma quantile (usually 84.1%)
+    - `sigma_2_low`: the lower 2-sigma quantile (usually 2.27%)
+    - `sigma_2_high`: the upper 2-sigma quantile (usually 97.7%)
 
     The plot includes a shaded region between the lower and upper quantiles (low/n and high/n).
 
@@ -384,9 +388,11 @@ def get_histogram_quantile_ranges(  # noqa: PLR0915
     - `{col}`: the center of the bin (repeated for all bin_edges keys)
     - `{col}_delta`: the width of the bin (repeated for all bin_edges keys)
     - `{success_column}`: the number of "good" samples in the bin
-    - `low`: the lower quantile (usually 5%)
     - `median`: the median
-    - `high`: the upper quantile (usually 95%)
+    - `sigma_1_low`: the lower 1-sigma quantile (15.9%)
+    - `sigma_1_high`: the upper 1-sigma quantile (84.1%)
+    - `sigma_2_low`: the lower 2-sigma quantile (2.27%)
+    - `sigma_2_high`: the upper 2-sigma quantile (97.7%)
 
     NOTE: the result is NOT sparse (it will contain all bins, even if there are no samples in it).
 

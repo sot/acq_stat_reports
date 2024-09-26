@@ -45,6 +45,7 @@ def test_histogram():
         success_column="success",
         prob_column="prob",
     )
+
     cols = [
         "a",
         "a_bin",
@@ -61,12 +62,15 @@ def test_histogram():
         "b_mean",
         "b_std",
         "bin",
-        "high",
-        "low",
         "median",
         "n",
+        "sigma_1_high",
+        "sigma_1_low",
+        "sigma_2_high",
+        "sigma_2_low",
         "success",
     ]
+
     assert cols == sorted(hist.colnames)
 
     n_a = len(bin_edges["a"]) + 1
@@ -108,11 +112,11 @@ def test_histogram():
     assert np.all(np.asarray(hist["b"]).reshape((n_a, n_b)) == ref)
 
     # quantiles
-    ref = np.array([[0, 1, 0, 1], [0, 0, 1, 0], [0, 4, 2, 1], [0, 0, 0, 0]])
-    assert np.all(np.asarray(hist["high"]).reshape((n_a, n_b)) == ref)
+    ref = np.array([[0, 1, 0, 1], [0, 0, 1, 0], [0, 4, 1, 1], [0, 0, 0, 0]])
+    assert np.all(np.asarray(hist["sigma_1_high"]).reshape((n_a, n_b)) == ref)
 
-    ref = np.array([[0, 0, 0, 1], [0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 0, 0]])
-    assert np.all(np.asarray(hist["low"]).reshape((n_a, n_b)) == ref)
+    ref = np.array([[0, 1, 0, 1], [0, 0, 1, 0], [0, 2, 0, 0], [0, 0, 0, 0]])
+    assert np.all(np.asarray(hist["sigma_1_low"]).reshape((n_a, n_b)) == ref)
 
 
 def test_histogram_3d():
@@ -166,11 +170,13 @@ def test_histogram_3d():
         "c_low",
         "c_mean",
         "c_std",
-        "high",
-        "low",
+        "sigma_1_low",
+        "sigma_1_high",
+        "sigma_2_low",
+        "sigma_2_high",
         "median",
         "n",
         "success",
     ]
 
-    assert cols == sorted(hist.colnames)
+    assert sorted(cols) == sorted(hist.colnames)
