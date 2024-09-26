@@ -12,7 +12,6 @@ import agasc
 import jinja2
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats
 import ska_matplotlib
 import ska_report_ranges
 from astropy import units as u
@@ -316,7 +315,7 @@ def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     plt.ylim(0, 9)
 
 
-def make_html(nav_dict, rep_dict, fail_dict, outdir):
+def make_html(nav_dict, acq_info, outdir):
     """Render and write the basic page.
 
     Render and write the basic page, where nav_dict is a dictionary of the
@@ -325,13 +324,27 @@ def make_html(nav_dict, rep_dict, fail_dict, outdir):
     contains the elements required for the extra table of failures at the
     bottom of the page, and outdir is the destination directory.
     """
+    fail_list = [fail for fail in acq_info["fails"].values() if fail["label"] != ""]
+
+    for label in acq_info["fails"]:
+        if label:
+            outfile = outdir / f"failed_acq_{label}_stars_list.html"
+        else:
+            outfile = outdir / "failed_acq_stars_list.html"
+        acq_info["fails"][label]["fail_file"] = outfile.relative_to(outdir)
+
+        template = JINJA_ENV.get_template("stars.html")
+        page = template.render(failed_stars=acq_info["fails"][label]["failed_stars"])
+        with open(outfile, "w") as fh:
+            fh.write(page)
+
     template = JINJA_ENV.get_template("index.html")
-    page = template.render(nav=nav_dict, fails=fail_dict, rep=rep_dict)
+    page = template.render(nav=nav_dict, fails=fail_list, rep=acq_info["info"])
     with open(outdir / "index.html", "w") as fh:
         fh.write(page)
 
 
-def acq_info(acqs, tname, range_datestart, range_datestop):
+def get_acq_info(acqs, tname, range_datestart, range_datestop):
     """
     Generate a report dictionary for the time range.
 
@@ -342,8 +355,6 @@ def acq_info(acqs, tname, range_datestart, range_datestop):
 
     :rtype: dict of report values
     """
-    pred = json.load(open(SKA / "data" / "acq_stat_reports" / "acq_fail_fitfile.json"))
-
     rep = {
         "datestring": tname,
         "datestart": range_datestart.date,
@@ -365,33 +376,27 @@ def acq_info(acqs, tname, range_datestart, range_datestop):
     rep["n_failed"] = len(np.flatnonzero(range_acqs["acqid"] == 0))
     rep["fail_rate"] = 1.0 * rep["n_failed"] / rep["n_stars"]
 
-    mean_time = (
-        CxoTime(rep["datestart"]).cxcsec + CxoTime(rep["datestop"]).cxcsec
-    ) / 2.0
-    mean_time_d_year = (mean_time - pred["time0"]) / (86400 * 365.25)
-    rep["fail_rate_pred"] = mean_time_d_year * pred["m"] + pred["b"]
-    rep["n_failed_pred"] = int(round(rep["fail_rate_pred"] * rep["n_stars"]))
+    rep["n_failed_pred"] = len(range_acqs) - np.sum(range_acqs["p_acq_model"])
+    rep["fail_rate_pred"] = rep["n_failed_pred"] / len(range_acqs)
 
-    rep["prob_less"] = scipy.stats.poisson.cdf(rep["n_failed"], rep["n_failed_pred"])
-    rep["prob_more"] = 1 - scipy.stats.poisson.cdf(
-        rep["n_failed"] - 1, rep["n_failed_pred"]
+    samples = (
+        np.random.uniform(size=1000 * len(range_acqs)).reshape((-1, len(range_acqs)))
+        < range_acqs["p_acq_model"][None]
     )
+    n = len(range_acqs) - np.sum(samples, axis=1)
+
+    sigma_1_low, sigma_1_high = np.percentile(n, [15.9, 84.1])
+    rep["prob_less"] = sigma_1_low
+    rep["prob_more"] = sigma_1_high
 
     r, low, high = binomial_confidence_interval(rep["n_failed"], rep["n_stars"])
     rep["fail_rate_err_high"], rep["fail_rate_err_low"] = high - r, r - low
 
-    return rep
-
-
-def make_fail_html(stars, outfile):
-    """
-    Render and write the expanded table of failed stars
-    """
-    template = JINJA_ENV.get_template("stars.html")
-    page = template.render(failed_stars=stars)
-    f = open(outfile, "w")
-    f.write(page)
-    f.close()
+    result = {
+        "info": rep,
+        "fails": acq_fails(acqs, range_datestart, range_datestop),
+    }
+    return result
 
 
 def acq_fails(acqs, range_datestart, range_datestop, outdir="out"):  #  noqa: ARG001  (commented out)
@@ -401,56 +406,61 @@ def acq_fails(acqs, range_datestart, range_datestop, outdir="out"):  #  noqa: AR
     little ones (by mag bin).
     """
 
-    fails = []
+    fails = {}
     range_acqs = acqs[
         (acqs["tstart"] >= range_datestart.cxcsec)
         & (acqs["tstart"] < range_datestop.cxcsec)
     ]
 
-    all_fails = range_acqs[range_acqs["acqid"] == 0]
-    failed_stars = []
-    for fail in all_fails:
-        star = {
-            "id": fail["agasc_id"],
-            "obsid": fail["obsid"],
-            "mag_exp": fail["mag"],
-            "mag_obs": fail["mag_obs"],
+    failed_stars = [
+        {
+            "id": int(mfail["agasc_id"]),
+            "obsid": int(mfail["obsid"]),
+            "mag_exp": mfail["mag"],
+            "mag_obs": mfail["mag_obs"],
             "acq_stat": "NOID",
         }
-        failed_stars.append(star)
-    make_fail_html(failed_stars, outdir / "failed_acq_stars_list.html")
+        for mfail in range_acqs[range_acqs["acqid"] == 0]
+    ]
+    n_stars = len(range_acqs)
+    n_failed = len(np.flatnonzero(range_acqs["acqid"] == 0))
+    fails[""] = {
+        # "mag_range": (-np.inf, np.inf),
+        "n_stars": n_stars,
+        "n_failed": n_failed,
+        "fail_rate": 0 if n_stars == 0 else n_failed / n_stars,
+        "label": "",
+        "failed_stars": failed_stars,
+    }
 
     bin = 0.1
     for tmag_start in np.arange(10.0, 10.8, 0.1):
+        label = f"{tmag_start:.1f}-{tmag_start + bin:.1f}"
         mag_range_acqs = range_acqs[
             (range_acqs["mag"] >= tmag_start) & (range_acqs["mag"] < (tmag_start + bin))
         ]
-        mfailed_stars = []
 
-        mag_fail_acqs = mag_range_acqs[mag_range_acqs["acqid"] == 0]
-        for mfail in mag_fail_acqs:
-            star = {
-                "id": mfail["agasc_id"],
-                "obsid": mfail["obsid"],
+        mfailed_stars = [
+            {
+                "id": int(mfail["agasc_id"]),
+                "obsid": int(mfail["obsid"]),
                 "mag_exp": mfail["mag"],
                 "mag_obs": mfail["mag_obs"],
                 "acq_stat": "NOID",
             }
-            mfailed_stars.append(star)
-        failed_star_file = outdir / f"failed_acq_{tmag_start:.1f}_stars_list.html"
-        make_fail_html(mfailed_stars, failed_star_file)
+            for mfail in mag_range_acqs[mag_range_acqs["acqid"] == 0]
+        ]
 
-        mag_fail = {
-            "n_stars": len(mag_range_acqs),
-            "n_failed": len(np.flatnonzero(mag_range_acqs["acqid"] == 0)),
+        n_stars = len(mag_range_acqs)
+        n_failed = len(np.flatnonzero(mag_range_acqs["acqid"] == 0))
+        fails[label] = {
+            "mag_range": (tmag_start, tmag_start + bin),
+            "n_stars": n_stars,
+            "n_failed": n_failed,
+            "fail_rate": 0 if n_stars == 0 else n_failed / n_stars,
+            "label": label,
+            "failed_stars": mfailed_stars,
         }
-        if mag_fail["n_stars"] == 0:
-            mag_fail["fail_rate"] = 0
-        else:
-            mag_fail["fail_rate"] = mag_fail["n_failed"] * 1.0 / mag_fail["n_stars"]
-        mag_fail["label"] = "%0.1f-%0.1f" % (tmag_start, tmag_start + bin)
-        mag_fail["fail_file"] = failed_star_file.name
-        fails.append(mag_fail)
 
     return fails
 
@@ -566,13 +576,9 @@ def main():
         logger.debug("Plots and HTML to %s" % webout)
         logger.debug("JSON to  %s" % dataout)
 
-        rep = acq_info(all_acq_upto, tname, range_datestart, range_datestop)
-        with open(dataout / "rep.json", "w") as rep_file:
-            rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
-
-        fails = acq_fails(all_acq_upto, range_datestart, range_datestop, outdir=webout)
-        with open(dataout / "fail.json", "w") as fail_file:
-            fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
+        acq_info = get_acq_info(all_acq_upto, tname, range_datestart, range_datestop)
+        with open(dataout / "acq_info.json", "w") as rep_file:
+            rep_file.write(json.dumps(acq_info, sort_keys=True, indent=4))
 
         prev_range = ska_report_ranges.get_prev(to_update[tname])
         next_range = ska_report_ranges.get_next(to_update[tname])
@@ -589,7 +595,7 @@ def main():
             tstart=range_datestart.secs,
             tstop=range_datestop.secs,
         )
-        make_html(nav, rep, fails, outdir=webout)
+        make_html(nav, acq_info, outdir=webout)
 
 
 if __name__ == "__main__":
