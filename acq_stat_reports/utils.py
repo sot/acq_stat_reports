@@ -1,5 +1,4 @@
 import functools
-import itertools
 from pathlib import Path
 from typing import Any
 
@@ -364,7 +363,137 @@ def _get_quantiles_(p_acq_model, quantiles=None, n_realizations=10000):
     return np.percentile(n, quantiles)
 
 
-def get_histogram_quantile_ranges(  # noqa: PLR0915
+def _check_arguments(indices, bin_edges):
+    """
+    Utility to verify that indices and bin edges are valid and consistent.
+
+    This function also does some argument transformations to interpret typical input formats.
+
+    Indices must not be negative, and must not be larger than the number of bins (including under-
+    and over-flow bins). For example, if the bin edges are [1, 2, 3], bin indices can not be larger
+    than 4.
+
+    Parameters
+    ----------
+    indices : array-like
+        The indices to check. It can be a structured or plain array.
+        The array must be 1- or 2-dimensional. If it is 2-dimensional, the dimensionality of the
+        data is given by the number of columns.
+    bin_edges : array-like or list of array-like
+        The bin edges. If it is a single array, the bins are assumed to apply in all dimensions.
+        If it is a list, it can have length 1 or have the same length as the number of columns in
+        indices.
+    """
+    indices = np.asarray(indices)
+    if indices.dtype.names:
+        # this is a structured array and we want a plain array
+        dtype = {indices.dtype[i] for i in range(len(indices.dtype))}
+        if len(set(dtype)) > 1:
+            raise ValueError(
+                f"All d-dimensional indices must be of the same type. Got {dtype}"
+            )
+        indices = np.array(
+            [indices[indices.dtype.names[i]] for i in range(len(indices.dtype.names))]
+        ).T
+    if len(indices.shape) == 1:
+        indices = indices[:, np.newaxis]
+
+    # Check and prepare bin_edges
+    try:
+        # this tries to figure out if the bins are a numpy 1d array
+        if len(np.shape(bin_edges)) == 1:
+            bin_edges = [bin_edges]
+    except ValueError:
+        pass
+
+    for i, edges in enumerate(bin_edges):
+        if np.any(indices[:, i] < 0):
+            raise ValueError("Indices must be non-negative")
+        if np.any(indices[:, i] >= len(edges) + 1):
+            raise ValueError("Indices must be less than the number of bins")
+
+    if len(bin_edges) != 1 and indices.shape[1] != len(bin_edges):
+        raise ValueError(
+            "bin_edges must be a list of length 1 or the number of columns in indices. "
+            f"Got len(bin_edges)={len(bin_edges)}) and n_cols={indices.shape[1]}"
+        )
+
+    if len(bin_edges) == 1 and indices.shape[1] > 1:
+        # if there is only one bin array, we assume it applies to all columns
+        bin_edges = [bin_edges[0] for _ in range(indices.shape[1])]
+
+    bin_edges = [np.atleast_1d(col_edges) for col_edges in bin_edges]
+    bin_shapes = [len(col_edges.shape) for col_edges in bin_edges]
+    if np.any(np.not_equal(bin_shapes, 1)):
+        raise ValueError(f"bin_edges must be a list of 1D arrays. Got {bin_shapes}")
+
+    return indices, bin_edges
+
+
+def get_global_bin_idx(indices, bin_edges):
+    """
+    Utility to calculate a unique bin index from a set of indices.
+
+    n-dimensional binning is done on n axes separately. That gives a tuple unique indices, one index
+    for each axis. Sometimes it is usefull to have a single index.
+
+    Parameters
+    ----------
+    indices : array-like
+        The indices to check. It can be a structured or plain array.
+        The array must be 1- or 2-dimensional. If it is 2-dimensional, the dimensionality of the
+        data is given by the number of columns.
+    bin_edges : array-like or list of array-like
+        The bin edges. If it is a single array, the bins are assumed to apply in all dimensions.
+        If it is a list, it can have length 1 or have the same length as the number of columns in
+        indices.
+    """
+    # Check and normalize indices and bin edges
+    indices, bin_edges = _check_arguments(indices, bin_edges)
+
+    n_cols = len(bin_edges)
+    sizes = [len(b) + 1 for b in bin_edges]
+    offsets = {i: (np.prod(sizes[:i]) if i > 0 else 1) for i in range(n_cols)}
+
+    global_bin_idx = np.zeros(len(indices), dtype=int)
+    for bin_col in range(n_cols):
+        global_bin_idx += offsets[bin_col] * indices[:, bin_col]
+    return global_bin_idx
+
+
+def _get_dtype(cols, extra_cols, success_column):
+    """
+    The standard dtype for get_histogram_quantile_ranges
+    """
+    dtype = [
+        ("bin", np.int64),
+        ("n", int),
+        (success_column, int),
+    ]
+    for col in cols:
+        dtype += [
+            (f"{col}_bin", np.int64),
+            (f"{col}_low", float),
+            (f"{col}_high", float),
+            (f"{col}", float),
+            (f"{col}_delta", float),
+        ]
+    for col in cols + extra_cols:
+        dtype += [
+            (f"{col}_mean", float),
+            (f"{col}_std", float),
+        ]
+    dtype += [
+        ("sigma_1_low", int),
+        ("sigma_1_high", int),
+        ("sigma_2_low", int),
+        ("sigma_2_high", int),
+        ("median", int),
+    ]
+    return np.dtype(dtype)
+
+
+def get_histogram_quantile_ranges(
     data,
     bin_edges,
     extra_cols=(),
@@ -377,16 +506,21 @@ def get_histogram_quantile_ranges(  # noqa: PLR0915
 
     This function expects a Table with `success_column` and `prob_column` columns. The
     `success_column` column tells whether this sample is a success, and `prob_column` is the
-    a-priori probability of success.
+    a-priori probability of success (used to calculate expected coverage intervals).
+
+    The data is binned using the columns given in `bin_edges`. The bin edges are given as a
+    dictionary of column names and bin edges. The bin edges must be 1D arrays.
+
+    Summary statistics are calculated for the columns in `bin_edges` and `extra_cols`.
 
     The function bins the data according to the columns given in `bin_edges`, and creates the
     following columns:
     - `bin`: the unique bin index
     - `n`: the number of samples in the bin
-    - `{col}_low`: the lower edge of the bin (repeated for all bin_edges keys)
-    - `{col}_high`: the upper edge of the bin (repeated for all bin_edges keys)
-    - `{col}`: the center of the bin (repeated for all bin_edges keys)
-    - `{col}_delta`: the width of the bin (repeated for all bin_edges keys)
+    - `{col}_low`: the lower edge of the bin (repeated for all bin_edges keys and extra_cols)
+    - `{col}_high`: the upper edge of the bin (repeated for all bin_edges keys and extra_cols)
+    - `{col}`: the center of the bin (repeated for all bin_edges keys and extra_cols)
+    - `{col}_delta`: the width of the bin (repeated for all bin_edges keys and extra_cols)
     - `{success_column}`: the number of "good" samples in the bin
     - `median`: the median
     - `sigma_1_low`: the lower 1-sigma quantile (15.9%)
@@ -403,6 +537,9 @@ def get_histogram_quantile_ranges(  # noqa: PLR0915
         for the bin edges.
     bin_edges : dict
         A dictionary of bin edges for each column.
+    extra_cols : list, optional
+        Extra columns to include in the output. These columns will have the mean and standard
+        deviation within each bin calculated.
     n_samples : int, optional
         The number of realizations to use in the Monte Carlo estimation of the expected successes.
     success_column: str, optional
@@ -423,116 +560,82 @@ def get_histogram_quantile_ranges(  # noqa: PLR0915
         if len(bin_edges[bin_col].shape) != 1:
             raise ValueError("bin_edges must be a dict of 1D arrays")
 
-    # data = data.copy()
-    bin_edges = bin_edges.copy()
-
-    # for bin_col in cols:
-    #     # no underflow (otherwise I one has to be careful with bin == 0)
-    #     data = data[data[bin_col] > bin_edges[bin_col][0]]
+    data = data.copy()
 
     sizes = [len(b) + 1 for b in bin_edges.values()]
-    offsets = {cols[0]: 1}
-    offsets.update({cols[i]: np.prod(sizes[:i]) for i in range(1, len(cols))})
 
-    global_bin_idx = np.zeros(len(data), dtype=int)
-    for bin_col in cols:
-        data[f"{bin_col}_bin"] = np.digitize(data[bin_col], bin_edges[bin_col])
-        global_bin_idx += offsets[bin_col] * data[f"{bin_col}_bin"]
-    data["bin"] = global_bin_idx
-
-    # now this is very inefficient, because we are making a list of all possible combinations of bin
-    # indices. Note that we are iterating over cols in reverse order so that the bin calculation
-    # agrees with the one on the data array.
-    bin_idx = dict(
-        zip(
-            cols[::-1],
-            np.array(
-                list(
-                    zip(
-                        *[
-                            list(j)
-                            for j in itertools.product(
-                                *[range(len(bin_edges[col]) + 1) for col in cols[::-1]]
-                            )
-                        ],
-                        strict=True,
-                    )
-                )
-            ),
-            strict=True,
-        )
-    )
-
-    # bins are the bin edges, and np.digitize returns indices assuming there are (n_bins - 1) bins,
-    # plus the under/overflow bins. That's (n_bins + 1) bins.
-    # for book-keeping, we will create padded arrays with -inf and +inf
+    # np.digitize returns indices assuming there are (N - 1) bins plus the under/overflow bins.
+    # That's (N + 1) bins.
+    # To easily set the bin ranges to all, including the under/over-flow, we will add -inf and +inf
+    # to the bin edges.
     padded_bins = {
         col: np.concatenate([[-np.inf], bin_edges[col], [np.inf]]) for col in cols
     }
 
-    quantiles = Table()
-    quantiles["bin"] = np.arange(len(bin_idx[cols[0]]))
-    for bin_col in cols:
-        j = bin_idx[bin_col]
-        quantiles[f"{bin_col}_bin"] = j
-        quantiles[f"{bin_col}_low"] = padded_bins[bin_col][j]
-        quantiles[f"{bin_col}_high"] = padded_bins[bin_col][j + 1]
-        quantiles[f"{bin_col}"] = (
-            quantiles[f"{bin_col}_low"] + quantiles[f"{bin_col}_high"]
-        ) / 2
-
-    # this is a sanity check that the bin indices as calculated above are correct
-    global_bin_idx = np.zeros(len(quantiles), dtype=int)
-    for bin_col in cols:
-        global_bin_idx += offsets[bin_col] * quantiles[f"{bin_col}_bin"]
-    assert np.all(quantiles["bin"] == global_bin_idx)
-    # end sanity check
-
-    g = data.group_by(bin_cols)
-    assert len(g.groups.indices) <= len(quantiles) + 1  # sanity check
-    idx = g[["bin"] + cols].groups.aggregate(np.mean)["bin"].astype(int)
-    mean = g[cols + extra_cols].groups.aggregate(np.mean)
-    std = g[cols + extra_cols].groups.aggregate(np.std)
-    n = np.diff(g.groups.indices)
-    acqid = g[success_column].groups.aggregate(np.count_nonzero)
-    sigma_2_low, sigma_1_low, median, sigma_1_high, sigma_2_high = np.vstack(
-        [
-            _get_quantiles_(
-                group[prob_column], [[2.27, 15.9, 50, 84.1, 97.7]], n_samples
-            )
-            for group in g.groups
-        ]
+    bins = np.array(
+        [np.digitize(data[bin_col], bin_edges[bin_col]) for bin_col in cols]
     ).T
 
-    quantiles["sigma_1_low"] = 0
-    quantiles["sigma_2_low"] = 0
-    quantiles["median"] = 0
-    quantiles["sigma_1_high"] = 0
-    quantiles["sigma_2_high"] = 0
-    quantiles["n"] = 0
-    quantiles[success_column] = 0
+    bin_cols = [f"{bin_col}_bin" for bin_col in cols]
+    # this is a unique bin index added for convenience
+    data["bin"] = get_global_bin_idx(bins, bin_edges.values())
 
-    quantiles["sigma_1_low"][idx] = sigma_1_low
-    quantiles["sigma_1_low"][idx] = sigma_1_low
-    quantiles["sigma_2_low"][idx] = sigma_2_low
-    quantiles["median"][idx] = median
-    quantiles["sigma_1_high"][idx] = sigma_1_high
-    quantiles["sigma_1_high"][idx] = sigma_1_high
-    quantiles["sigma_2_high"][idx] = sigma_2_high
-    quantiles["n"][idx] = n
-    quantiles[success_column][idx] = acqid
+    # this creates an array with all possible combinations of indices (sorted by global bin)
+    bin_indices = np.meshgrid(*[list(range(s)) for s in sizes[::-1]], indexing="ij")[
+        ::-1
+    ]
 
+    quantiles = np.zeros(
+        np.prod(sizes),
+        dtype=_get_dtype(cols, extra_cols, success_column),
+    )
+
+    # default non-zero values
+    for col in cols + extra_cols:
+        quantiles[f"{col}_mean"] = np.nan
+        quantiles[f"{col}_std"] = np.nan
+        quantiles[f"{col}_mean"] = np.nan
+        quantiles[f"{col}_std"] = np.nan
+
+    # bin index values
+    for idx, bin_col in enumerate(cols):
+        quantiles[f"{bin_col}_bin"] = bin_indices[idx].flatten()
+    quantiles["bin"] = get_global_bin_idx(quantiles[bin_cols], bin_edges.values())
+
+    # bin edges
     for col in cols:
-        quantiles[f"{col}_mean"] = np.nan
-        quantiles[f"{col}_mean"][idx] = mean[col]
+        quantiles[f"{col}_low"] = padded_bins[col][quantiles[f"{col}_bin"]]
+        quantiles[f"{col}_high"] = padded_bins[col][quantiles[f"{col}_bin"] + 1]
+        quantiles[f"{col}"] = (quantiles[f"{col}_low"] + quantiles[f"{col}_high"]) / 2
         quantiles[f"{col}_delta"] = quantiles[f"{col}_high"] - quantiles[f"{col}_low"]
-        quantiles[f"{col}_std"] = np.nan
-        quantiles[f"{col}_std"][idx] = std[col]
-    for col in extra_cols:
-        quantiles[f"{col}_mean"] = np.nan
-        quantiles[f"{col}_mean"][idx] = mean[col]
-        quantiles[f"{col}_std"] = np.nan
-        quantiles[f"{col}_std"][idx] = std[col]
 
+    # the actual data
+    for bin_idx in np.unique(data["bin"]):
+        # this is the only place where the global bin index is used.
+        # one can replace this by a mask using the bin indices of each column if so desired.
+        sel = data["bin"] == bin_idx
+
+        sigma_2_low, sigma_1_low, median, sigma_1_high, sigma_2_high = _get_quantiles_(
+            data[prob_column][sel], [2.27, 15.9, 50, 84.1, 97.7], n_samples
+        )
+
+        for col in cols + extra_cols:
+            quantiles[f"{col}_mean"][bin_idx] = np.mean(data[col][sel])
+            quantiles[f"{col}_std"][bin_idx] = np.std(data[col][sel])
+
+        quantiles["sigma_1_low"][bin_idx] = sigma_1_low
+        quantiles["sigma_1_low"][bin_idx] = sigma_1_low
+        quantiles["sigma_2_low"][bin_idx] = sigma_2_low
+        quantiles["median"][bin_idx] = median
+        quantiles["sigma_1_high"][bin_idx] = sigma_1_high
+        quantiles["sigma_1_high"][bin_idx] = sigma_1_high
+        quantiles["sigma_2_high"][bin_idx] = sigma_2_high
+        quantiles["n"][bin_idx] = np.count_nonzero(sel)
+        quantiles[success_column][bin_idx] = np.count_nonzero(
+            sel & data[success_column]
+        )
+
+    quantiles = Table(quantiles)
     quantiles.meta["shape"] = tuple(sizes)[::-1]
+
     return quantiles

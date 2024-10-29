@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from astropy.table import Table
 
 from acq_stat_reports import utils
@@ -35,6 +36,8 @@ def test_histogram():
             "prob": [0.5, 0.9, 0.3, 0.7, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
         }
     )
+    example_copy = example.copy()
+
     bin_edges = {
         "a": np.array([1, 5, 9]),
         "b": np.array([1, 3.5, 7]),
@@ -70,6 +73,11 @@ def test_histogram():
         "sigma_2_low",
         "success",
     ]
+
+    # check that the input table was not modified
+    assert example.colnames == example_copy.colnames
+    for col in example.colnames:
+        assert np.all(example[col] == example_copy[col])
 
     assert cols == sorted(hist.colnames)
 
@@ -180,3 +188,149 @@ def test_histogram_3d():
     ]
 
     assert sorted(cols) == sorted(hist.colnames)
+
+
+def test_global_bin():
+    # Basic arguments (no implicit conversions)
+
+    # 1d case with 10 bins plus under/over-flow
+    # under-flow is 0, over-flow is 11 (what actually matters is the shape of the bins)
+    bin_ranges = [
+        [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
+    ]  # list of arrays
+    indices = np.array([[2, 3, 2, 11, 11, 0, 4, 9, 8, 4]]).T  # 2d array
+
+    # in 1d, the global bin is trivial
+    assert np.all(utils.get_global_bin_idx(indices, bin_ranges) == indices.flatten())
+
+    # 2d case with 4 bins in the first dimension and 3 bins in the second
+    bin_ranges = [list(range(5)), list(range(4))]
+    # these are all the possible bin indices (sorted by global bin)
+    indices = np.array(
+        [
+            [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+            ],
+            [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+            ],
+        ]
+    ).T
+    idx = np.arange(len(indices))
+    assert np.all(utils.get_global_bin_idx(indices, bin_ranges) == idx)
+
+    # Table is a possible input
+    table = Table(
+        {
+            "a": indices[:, 0],
+            "b": indices[:, 1],
+        }
+    )
+    assert np.all(utils.get_global_bin_idx(table, bin_ranges) == idx)
+
+    # 3d case
+    shape = [5, 6, 4]
+    bins = [list(range(s)) for s in shape]
+    idx1, idx2, idx3 = np.broadcast_arrays(
+        np.arange(shape[0] + 1)[np.newaxis, np.newaxis, :],
+        np.arange(shape[1] + 1)[np.newaxis, :, np.newaxis],
+        np.arange(shape[2] + 1)[:, np.newaxis, np.newaxis],
+    )
+    indices = np.vstack([idx1.flatten(), idx2.flatten(), idx3.flatten()]).T
+    idx = np.arange(len(indices))
+    assert np.all(utils.get_global_bin_idx(indices, bins) == idx)
+
+    # Argument validation
+
+    # 1d case. It should be possible to pass 1d arrays (both indices and bin_ranges)
+    bin_ranges = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]  # array
+    indices = np.array([2, 3, 2, 11, 11, 0, 4, 9, 8, 4])  # 1d array
+    assert np.all(utils.get_global_bin_idx(indices, bin_ranges) == np.array(indices))
+
+    # 2d case. If only one array of bin ranges is passed, it is used for all dimensions
+    bin_ranges = list(range(4))
+    indices = np.array(
+        [
+            [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
+            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4],
+        ]
+    ).T
+    idx = np.arange(len(indices))
+
+    assert np.all(utils.get_global_bin_idx(indices, [bin_ranges, bin_ranges]) == idx)
+    assert np.all(utils.get_global_bin_idx(indices, [bin_ranges]) == idx)
+    assert np.all(utils.get_global_bin_idx(indices, bin_ranges) == idx)
+
+    # invalid bins
+    bin_ranges = [list(range(3)), list(range(4))]
+    with pytest.raises(ValueError):
+        utils.get_global_bin_idx([[-1, 2]], bin_ranges)
+
+    with pytest.raises(ValueError):
+        utils.get_global_bin_idx([[1, -1]], bin_ranges)
+
+    utils.get_global_bin_idx([[3, 4]], bin_ranges)
+    with pytest.raises(ValueError):
+        utils.get_global_bin_idx([[3, 5]], bin_ranges)
+
+    utils.get_global_bin_idx([[3, 2]], bin_ranges)
+    with pytest.raises(ValueError):
+        utils.get_global_bin_idx([[4, 2]], bin_ranges)
