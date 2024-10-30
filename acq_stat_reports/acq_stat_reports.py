@@ -153,36 +153,31 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         ),
     }
 
-    functions = {
-        "acq_stars_plot": acq_stars_plot,
-        "mag_scatter_plot": mag_scatter_plot,
-        "utils.binned_data_fraction_plot": utils.binned_data_fraction_plot,
-        "utils.binned_data_plot": utils.binned_data_plot,
-        "utils.binned_data_probability_plot": utils.binned_data_probability_plot,
-        "fail_rate_plot": fail_rate_plot,
-    }
-
-    plot_params = {
-        "acq_stars": {
+    plot_params = [
+        {
+            "description": "Timeline of the number of identified acq stars in the last two years",
             "data": "two_year_acqs",
-            "class": "acq_stars_plot",
+            "function": acq_stars_plot,
             "parameters": {"filename": "id_acq_stars.png", "figscale": (2, 1)},
         },
-        "expected_fails": {
+        {
+            "description": "Timeline of the acquisition failure rate in the last two years",
             "data": "binned_time",
-            "class": "fail_rate_plot",
+            "function": fail_rate_plot,
             "parameters": {"filename": "fail_rate_plot.png", "figscale": (2, 1)},
         },
-        "mag_scatter": {
+        {
+            "description": "Scatter plot of observed magnitude Vs catalog magnitude",
             "data": "all_acq",
-            "class": "mag_scatter_plot",
+            "function": mag_scatter_plot,
             "parameters": {
                 "filename": "delta_mag_scatter.png",
             },
         },
-        "mag_histogram": {
+        {
+            "description": "Histogram of magnitudes of acquisition failures",
             "data": "binned_mag",
-            "class": "utils.binned_data_plot",
+            "function": utils.binned_data_plot,
             "parameters": {
                 "xlabel": "Star magnitude (mag)",
                 "ylabel": "N stars",
@@ -194,9 +189,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
                 "filename": "mag_histogram.png",
             },
         },
-        "t_ccd_histogram": {
+        {
+            "description": "Histogram of T_CCD of acquisition failures",
             "data": "binned_t_ccd",
-            "class": "utils.binned_data_plot",
+            "function": utils.binned_data_plot,
             "parameters": {
                 "xlabel": "T$_{CCD}$",
                 "ylabel": "N stars",
@@ -208,9 +204,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
                 "filename": "t_ccd_histogram.png",
             },
         },
-        "mag_pointhist": {
+        {
+            "description": "",
             "data": "variable_binned_mag",
-            "class": "utils.binned_data_fraction_plot",
+            "function": utils.binned_data_fraction_plot,
             "parameters": {
                 "xlabel": "Star magnitude (mag)",
                 "ylabel": "Fraction Acquired",
@@ -218,9 +215,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
                 "filename": "mag_pointhist.png",
             },
         },
-        "t_ccd_pointhist": {
+        {
+            "description": "Fraction of acquisition successes vs T_CCD",
             "data": "binned_t_ccd",
-            "class": "utils.binned_data_fraction_plot",
+            "function": utils.binned_data_fraction_plot,
             "parameters": {
                 "xlabel": "T$_{CCD}$",
                 "ylabel": "Fraction Acquired",
@@ -228,17 +226,18 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
                 "filename": "t_ccd_pointhist.png",
             },
         },
-        "prob_scatter": {
+        {
+            "description": "Fraction of acquisition successes vs Magnitude",
             "data": "binned_p_acq",
-            "class": "utils.binned_data_probability_plot",
+            "function": utils.binned_data_probability_plot,
             "parameters": {
                 "filename": "prob_scatter.png",
             },
         },
-    }
+    ]
 
-    for params in plot_params.values():
-        functions[params["class"]](datasets[params["data"]], **params["parameters"])
+    for params in plot_params:
+        params["function"](datasets[params["data"]], **params["parameters"])
 
 
 @utils.mpl_plot(
