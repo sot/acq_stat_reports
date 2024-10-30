@@ -364,7 +364,7 @@ def binned_data_probability_plot(
     plt.xlim(0, 1)
 
 
-def _get_quantiles_(p_acq_model, quantiles=None, n_realizations=10000):
+def get_quantiles(p_acq_model, quantiles=None, n_realizations=10000):
     """
     Generate the 5th, 50th, and 95th percentiles of the expected number of successes in a series.
 
@@ -383,14 +383,20 @@ def _get_quantiles_(p_acq_model, quantiles=None, n_realizations=10000):
     array-like
         The quantiles
     """
+    p_acq_model = np.atleast_1d(p_acq_model).flatten()
+
     if quantiles is None:
         quantiles = [15.9, 50, 84.1]
+    # The input is an array of N probabilities, one for each draw,
+    # and we want to generate n_realizations realizations of the series.
+    # That is an array with shape (n_realizations, N)
     samples = (
         np.random.uniform(size=n_realizations * len(p_acq_model)).reshape(
             (-1, len(p_acq_model))
         )
         < p_acq_model[None]
     )
+    # we get the number of successes for each realization by summing along the p_acq axis (axis 1)
     n = np.sum(samples, axis=1)
     return np.percentile(n, quantiles)
 
@@ -647,7 +653,7 @@ def get_histogram_quantile_ranges(
         # one can replace this by a mask using the bin indices of each column if so desired.
         sel = data["bin"] == bin_idx
 
-        sigma_2_low, sigma_1_low, median, sigma_1_high, sigma_2_high = _get_quantiles_(
+        sigma_2_low, sigma_1_low, median, sigma_1_high, sigma_2_high = get_quantiles(
             data[prob_column][sel], [2.27, 15.9, 50, 84.1, 97.7], n_samples
         )
 
