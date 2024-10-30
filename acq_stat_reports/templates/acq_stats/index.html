@@ -33,7 +33,7 @@
 <TR><TH colspan=2></TH><TH colspan=6>failed_acq</TH></TR>
 <TR><TH></TH><TH></TH><TH colspan=4>stars</TH><TH colspan=2>rate</TH></TR> 
 <TR><TH></TH><TH>n stars</TH><TH>actual</TH><TH>pred.</TH>
-<TH>P Less</TH><TH>P More</TH>
+<TH>q<sub>16</sub></TH><TH>q<sub>84</TH>
 <TH>actual</TH><TH> pred.</TH></TR> 
 <TR><TD>report</TD><TD>{{ rep.n_stars }}</TD>
 {% if rep.n_failed > 0 %}
@@ -41,9 +41,9 @@
 {% else %}
 <TD>{{ rep.n_failed }}</TD>
 {% endif %}
-<TD>{{ rep.n_failed_pred }}</TD>
-<TD>{{ "%.3f"|format(rep.prob_less) }}</TD><TD>{{ "%.3f"|format(rep.prob_more) }}</TD>
-<TD>{{ "%.3f"|format(rep.fail_rate) }}</TD><TD>{{ "%.3f"|format(rep.fail_rate_pred) }}</TD></TR> 
+<TD>{{ "%.2f"|format(rep.n_failed_pred) }}</TD>
+<TD>{{ "%.2f"|format(rep.prob_less) }}</TD><TD>{{ "%.2f"|format(rep.prob_more) }}</TD>
+<TD>{{ "%.2f"|format(rep.fail_rate) }}</TD><TD>{{ "%.2f"|format(rep.fail_rate_pred) }}</TD></TR> 
 </TABLE> 
 
 

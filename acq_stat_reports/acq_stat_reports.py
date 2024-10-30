@@ -12,7 +12,6 @@ import agasc
 import jinja2
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats
 import ska_matplotlib
 import ska_report_ranges
 from astropy import units as u
@@ -355,8 +354,6 @@ def get_acq_info(acqs, tname, range_datestart, range_datestop):
 
     :rtype: dict of report values
     """
-    pred = json.load(open(SKA / "data" / "acq_stat_reports" / "acq_fail_fitfile.json"))
-
     rep = {
         "datestring": tname,
         "datestart": range_datestart.date,
@@ -378,17 +375,18 @@ def get_acq_info(acqs, tname, range_datestart, range_datestop):
     rep["n_failed"] = len(np.flatnonzero(range_acqs["acqid"] == 0))
     rep["fail_rate"] = 1.0 * rep["n_failed"] / rep["n_stars"]
 
-    mean_time = (
-        CxoTime(rep["datestart"]).cxcsec + CxoTime(rep["datestop"]).cxcsec
-    ) / 2.0
-    mean_time_d_year = (mean_time - pred["time0"]) / (86400 * 365.25)
-    rep["fail_rate_pred"] = mean_time_d_year * pred["m"] + pred["b"]
-    rep["n_failed_pred"] = int(round(rep["fail_rate_pred"] * rep["n_stars"]))
+    rep["n_failed_pred"] = len(range_acqs) - np.sum(range_acqs["p_acq_model"])
+    rep["fail_rate_pred"] = rep["n_failed_pred"] / len(range_acqs)
 
-    rep["prob_less"] = scipy.stats.poisson.cdf(rep["n_failed"], rep["n_failed_pred"])
-    rep["prob_more"] = 1 - scipy.stats.poisson.cdf(
-        rep["n_failed"] - 1, rep["n_failed_pred"]
+    samples = (
+        np.random.uniform(size=1000 * len(range_acqs)).reshape((-1, len(range_acqs)))
+        < range_acqs["p_acq_model"][None]
     )
+    n = len(range_acqs) - np.sum(samples, axis=1)
+
+    sigma_1_low, sigma_1_high = np.percentile(n, [15.9, 84.1])
+    rep["prob_less"] = sigma_1_low
+    rep["prob_more"] = sigma_1_high
 
     r, low, high = binomial_confidence_interval(rep["n_failed"], rep["n_stars"])
     rep["fail_rate_err_high"], rep["fail_rate_err_low"] = high - r, r - low
