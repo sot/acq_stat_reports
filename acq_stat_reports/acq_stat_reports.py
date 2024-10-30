@@ -465,7 +465,7 @@ def acq_fails(acqs, range_datestart, range_datestop, outdir="out"):  #  noqa: AR
     return fails
 
 
-def get_data():
+def get_data(remove_bad_stars=False):
     mica_acq_stats_file = (
         Path(os.environ["SKA"]) / "data" / "acq_stats" / "acq_stats.h5"
     )
@@ -507,7 +507,7 @@ def get_data():
     # Remove known bad stars
     bad_stars = agasc.get_supplement_table("bad")
     bad = np.isin(all_acq["agasc_id"], bad_stars["agasc_id"]) | all_acq["known_bad"]
-    if conf.remove_bad_stars:
+    if remove_bad_stars:
         all_acq = all_acq[~bad]
     else:
         all_acq["bad_star"] = bad

@@ -8,9 +8,6 @@ class Config:
     # "Default figure height in inches",
     figure_height = 2.5
 
-    # "Do not include bad stars in the reports",
-    remove_bad_stars = False
-
     # "Matplotlib style to use",
     mpl_style = "bmh"
 
