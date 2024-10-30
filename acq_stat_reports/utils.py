@@ -1,4 +1,5 @@
 import functools
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,13 +14,21 @@ from chandra_aca.star_probs import binomial_confidence_interval
 from acq_stat_reports.config import conf
 
 
+@dataclass
 class BinnedData:
-    def __init__(self, data, bins, extra_cols=None, selection=None):
+    """
+    Class to store the data and results from get_histogram_quantile_ranges.
+    """
+
+    bins: dict[str, np.ndarray]
+    data: Table
+    binned_data: Table
+
+    def __init__(self, data, bins, extra_cols=None):
         self.bins = bins
-        self.selection = selection if selection is not None else (lambda x: x)
-        self.data = self.selection(data)
+        self.data = data
         self.binned_data = get_histogram_quantile_ranges(
-            self.selection(data),
+            data,
             bin_edges=self.bins,
             extra_cols=[] if extra_cols is None else extra_cols,
         )
