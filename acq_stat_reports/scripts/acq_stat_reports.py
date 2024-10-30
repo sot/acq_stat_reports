@@ -70,12 +70,12 @@ def get_parser():
     return parser
 
 
-def main():
+def main(sys_args=None):
     import matplotlib
 
     matplotlib.use("agg")
 
-    args = get_parser().parse_args()
+    args = get_parser().parse_args(sys_args)
 
     logger.setLevel(args.v.upper())
 
