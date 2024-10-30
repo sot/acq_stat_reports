@@ -46,6 +46,29 @@ def _mpl_hist_steps(arr, arr2=None):
 def mpl_plot(**defaults):
     """
     Decorator to handle common matplotlib plotting tasks.
+
+    This decorator can take kwargs to serve as defaults for the wrapped function.
+
+    Before calling the wrapped function, the following parameters are popped from kwargs:
+
+        * filename: str. Used to save the figure.
+        * ax: matplotlib.axes.Axes. The matplotlib axes to use. If not given, a new figure is
+          created.
+        * figsize: tuple. Figure size in inches. Default: (conf.figure_width, conf.figure_height).
+        * figscale: tuple. Scale factor applied to figsize. Defaults to (1, 1).
+        * outdir: Path. The directory where to save the image. Default: conf.data_dir.
+        * style: str. The matplotlib style to use. Default: conf.mpl_style.
+        * xlabel: str. Label for the x-axis. Default: "".
+        * ylabel: str. Label for the y-axis. Default: "".
+        * title: str. The title of the plot. Default: "".
+        * legend: bool. Whether to draw the legend. Default: False.
+
+    All other kwargs are passed to the wrapped function.
+
+    Prameters
+    ---------
+    defaults : dict
+        Default values for the parameters.
     """
 
     def wrap(func):
