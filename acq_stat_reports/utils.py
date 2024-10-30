@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 # from typing import Callable
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -88,7 +89,6 @@ def mpl_plot(**defaults):
 
             filename = options.pop("filename", None)
             ax = options.pop("ax", None)
-            close_figures = options.pop("close_figures", conf.close_figures)
             figsize = options.pop("figsize", (conf.figure_width, conf.figure_height))
             figscale = options.pop("figscale", (1, 1))
             figscale, _ = np.broadcast_arrays(figscale, [1, 1])
@@ -113,7 +113,7 @@ def mpl_plot(**defaults):
 
                 if outdir and filename:
                     plt.savefig(outdir / filename)
-                if close_figures:
+                if matplotlib.pyplot.isinteractive():
                     plt.close(fig)
 
         return wrapped_function

@@ -8,9 +8,6 @@ class Config:
     # "Default figure height in inches",
     figure_height = 2.5
 
-    # "Close matplotlib figures after plotting",
-    close_figures = False
-
     # "Do not include bad stars in the reports",
     remove_bad_stars = False
 

@@ -66,7 +66,7 @@ def get_parser():
         type=int,
     )
     parser.add_argument(
-        "-v",
+        "--log-level",
         default="INFO",
         choices=[
             "DEBUG",
