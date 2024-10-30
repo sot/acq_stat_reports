@@ -50,6 +50,7 @@ def get_parser():
         default=Path(SKA / "www" / "ASPECT" / "acq_stat_reports"),
         help="Output directory (default is $SKA/www/ASPECT/acq_stat_reports)",
         type=Path,
+        dest="output_dir",
     )
     parser.add_argument(
         "--url",
@@ -564,15 +565,17 @@ def main():
         # in question (happens during reprocessing) for consistency
         all_acq_upto = all_acq[all_acq["tstart"] <= CxoTime(range_datestop).secs]
 
-        webout = args.webdir / f"{to_update[tname]['year']}" / to_update[tname]["subid"]
-        webout.mkdir(parents=True, exist_ok=True)
+        output_dir = (
+            args.output_dir / f"{to_update[tname]['year']}" / to_update[tname]["subid"]
+        )
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         dataout = (
             args.datadir / f"{to_update[tname]['year']}" / to_update[tname]["subid"]
         )
         dataout.mkdir(parents=True, exist_ok=True)
 
-        logger.debug("Plots and HTML to %s" % webout)
+        logger.debug("Plots and HTML to %s" % output_dir)
         logger.debug("JSON to  %s" % dataout)
 
         acq_info = get_acq_info(all_acq_upto, tname, range_datestart, range_datestop)
@@ -587,14 +590,14 @@ def main():
             "prev": f"{args.url}/{prev_range['year']}/{prev_range['subid']}/index.html",
         }
 
-        conf.data_dir = str(webout)
+        conf.output_dir = str(output_dir)
         conf.close_figures = True
         make_acq_plots(
             all_acq_upto,
             tstart=range_datestart.secs,
             tstop=range_datestop.secs,
         )
-        make_html(nav, acq_info, outdir=webout)
+        make_html(nav, acq_info, outdir=output_dir)
 
 
 if __name__ == "__main__":

@@ -94,7 +94,7 @@ def mpl_plot(**defaults):
             figscale, _ = np.broadcast_arrays(figscale, [1, 1])
             figsize = (figsize[0] * figscale[0], figsize[1] * figscale[1])
 
-            outdir = options.pop("outdir", Path(conf.data_dir))
+            outdir = options.pop("outdir", Path(conf.output_dir))
 
             with plt.style.context(options.pop("style", conf.mpl_style)):
                 if ax is None:

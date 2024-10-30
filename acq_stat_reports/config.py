@@ -1,6 +1,6 @@
 class Config:
     # "Top-level data directory",
-    data_dir = "."
+    output_dir = "."
 
     # "Default figure width in inches",
     figure_width = 5
