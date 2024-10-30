@@ -330,7 +330,7 @@ def make_html(nav_dict, acq_info, outdir):
             outfile = outdir / f"failed_acq_{label}_stars_list.html"
         else:
             outfile = outdir / "failed_acq_stars_list.html"
-        acq_info["fails"][label]["fail_file"] = outfile
+        acq_info["fails"][label]["fail_file"] = outfile.relative_to(outdir)
 
         template = JINJA_ENV.get_template("stars.html")
         page = template.render(failed_stars=acq_info["fails"][label]["failed_stars"])
