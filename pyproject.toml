@@ -16,6 +16,6 @@ build-backend = "setuptools.build_meta"
 Homepage = "https://github.com/sot/acq_stat_reports"
 
 [project.scripts]
-acq-stat-reports = "acq_stat_reports.acq_stat_reports:main"
+acq-stat-reports = "acq_stat_reports.scripts.acq_stat_reports:main"
 acq-stat-reports-toc = "acq_stat_reports.toc:main"
 acq-stat-reports-summary = "acq_stat_reports.acq_summarize:main"
