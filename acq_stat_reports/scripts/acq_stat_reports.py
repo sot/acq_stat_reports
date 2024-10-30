@@ -12,8 +12,8 @@ from astropy import units as u
 from cxotime import CxoTime
 from ska_helpers import logging
 
+from acq_stat_reports import config as conf
 from acq_stat_reports import get_acq_info, get_data, make_acq_plots, make_html
-from acq_stat_reports.config import conf
 
 SKA = Path(os.environ["SKA"])
 

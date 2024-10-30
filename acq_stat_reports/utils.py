@@ -12,7 +12,7 @@ import numpy as np
 from astropy.table import Table
 from chandra_aca.star_probs import binomial_confidence_interval
 
-from acq_stat_reports.config import conf
+from acq_stat_reports import config as conf
 
 
 @dataclass
