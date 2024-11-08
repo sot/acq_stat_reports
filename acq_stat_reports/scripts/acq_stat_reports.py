@@ -37,11 +37,6 @@ def get_parser():
         dest="output_dir",
     )
     parser.add_argument(
-        "--url",
-        help="URL root of the deployed page (default is /mta/ASPECT/acq_stat_reports/)",
-        default="/mta/ASPECT/acq_stat_reports/",
-    )
-    parser.add_argument(
         "--start_time", help="Start time (default is NOW)", default=None
     )
     parser.add_argument(
@@ -121,9 +116,9 @@ def main(sys_args=None):
         prev_range = ska_report_ranges.get_prev(to_update[tname])
         next_range = ska_report_ranges.get_next(to_update[tname])
         nav = {
-            "main": args.url,
-            "next": f"{args.url}/{next_range['year']}/{next_range['subid']}/index.html",
-            "prev": f"{args.url}/{prev_range['year']}/{prev_range['subid']}/index.html",
+            "main": "../../..",
+            "next": f"../../../{next_range['year']}/{next_range['subid']}/index.html",
+            "prev": f"../../../{prev_range['year']}/{prev_range['subid']}/index.html",
         }
 
         conf.output_dir = str(output_dir)
