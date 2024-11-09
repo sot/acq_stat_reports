@@ -1,75 +1,86 @@
-<HTML>
-<HEAD>
-<TITLE>Acquisition Statistics Report</TITLE>
-<link href="/mta/ASPECT/aspect.css" rel="stylesheet" type="text/css" media="all" />
-  <style type="text/css">
-  body { min-width:900px;
-  background:url('http://asc.harvard.edu/mta/ASPECT/blue_paper.gif');
-  }
+<html>
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
 
-</style>
-</HEAD>
-<BODY>
-<TABLE>
-<TR>
-<TD><A HREF="{{ nav.main }}">UP TO MAIN</A></TD>
-<TD><A HREF="{{ nav.prev }}">PREV</A></TD>
-<TD><A HREF="{{ nav.next }}">NEXT</A></TD>
-</TR>
-</TABLE>
+	<!-- the following line is to support MathJax in older browsers -->
+	<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+	</script>
+	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"
+				rel="stylesheet"
+				integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
+				crossorigin="anonymous">
 
-<H2>Acq Stats Report - {{ rep.datestring }}</H2>
-<H3>{{ rep.human_date_start }} through {{ rep.human_date_stop }}</H3>
+	<style>
+		h1 {
+			color: #990000;
+		}
+
+		h2 {
+			color: #990000;
+		}
+	</style>
+  <title>Acquisition Statistics Report</title>
+</head>
+
+<body>
+	<div class="container-md">
+		<!--#include virtual="/incl/header.html"-->
+	</div>
+
+  <div class="container-md">
+    <h2> Acq Stats Report </h2>
+
+    <p>
+      Some descriptive text
+    </p>
+
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+    {% for tr in time_ranges %} 
+      <li class="nav-item" role="presentation">
+        <button 
+          class="nav-link {% if loop.index == 1%}active{% endif %}"
+          id="{{ tr.name }}-tab"
+          data-bs-toggle="tab"
+          data-bs-target="#{{ tr.name }}"
+          type="button"
+          role="tab"
+          aria-controls="{{ tr.name }}"
+          aria-selected="{% if loop.index == 1%}true{% else %}false{% endif %}"
+        >
+          {{ tr.name }}
+        </button>
+      </li>
+    {% endfor %}
+    </ul>
+    <div class="tab-content" id="myTabContent">
+    {% for tr in time_ranges %} 
+      <div class="tab-pane fade {% if loop.index == 1%}show active{% endif %}" id="{{ tr.name }}" role="tabpanel" aria-labelledby="{{ tr.name }}-tab">
+        <p>
+          Time Range: {{ tr.human_date_start }} through {{ tr.human_date_stop }} ({{ tr.datestart }} - {{ tr.datestop }})
+        </p>
+        <table>
+          <tr><TD colspan=2><img src="{{ tr.name }}/fail_rate_plot.png"></td></tr>
+          <tr><td><img src="{{ tr.name }}/mag_pointhist.png"></td><td><img src="{{ tr.name }}/t_ccd_pointhist.png"></td></tr>
+          <tr><td><img src="{{ tr.name }}/mag_histogram.png"></td><td><img src="{{ tr.name }}/t_ccd_histogram.png"></td></tr>
+          <tr><TD colspan=2><img src="{{ tr.name }}/id_acq_stars.png"></td></tr>
+          <tr><td><img src="{{ tr.name }}/prob_scatter.png"></td><td><img src="{{ tr.name }}/delta_mag_scatter.png"></td></tr>
+        </table>
+      </div>
+    {% endfor %}
+    </div>
+  </div>
 
 
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
+    crossorigin="anonymous">
+  </script>
 
-<TABLE BORDER=1>
-<TR><TH>TSTART</TH><TH>TSTOP</TH></TR>
-<TR><TD>{{ rep.datestart }}</TD><TD>{{ rep.datestop }}</TD></TR>
-</TABLE>
-
-
-<TABLE BORDER=1>
-<TR><TH colspan=2></TH><TH colspan=6>failed_acq</TH></TR>
-<TR><TH></TH><TH></TH><TH colspan=4>stars</TH><TH colspan=2>rate</TH></TR> 
-<TR><TH></TH><TH>n stars</TH><TH>actual</TH><TH>pred.</TH>
-<TH>q<sub>16</sub></TH><TH>q<sub>84</TH>
-<TH>actual</TH><TH> pred.</TH></TR> 
-<TR><TD>report</TD><TD>{{ rep.n_stars }}</TD>
-{% if rep.n_failed > 0 %}
-<TD><A HREF="failed_acq_stars_list.html">{{ rep.n_failed }}</A></TD>
-{% else %}
-<TD>{{ rep.n_failed }}</TD>
-{% endif %}
-<TD>{{ "%.2f"|format(rep.n_failed_pred) }}</TD>
-<TD>{{ "%.2f"|format(rep.prob_less) }}</TD><TD>{{ "%.2f"|format(rep.prob_more) }}</TD>
-<TD>{{ "%.2f"|format(rep.fail_rate) }}</TD><TD>{{ "%.2f"|format(rep.fail_rate_pred) }}</TD></TR> 
-</TABLE> 
-
-
-<TABLE>
-<TR><TD><img src="mag_pointhist.png"></TD><TD><img src="t_ccd_pointhist.png"></TD></TR>
-<TR><TD><img src="mag_histogram.png"></TD><TD><img src="t_ccd_histogram.png"></TD></TR>
-<TR><TD colspan=2><img src="id_acq_stars.png"></TD></TR>
-<TR><TD colspan=2><img src="fail_rate_plot.png"></TD></TR>
-<TR><TD><img src="prob_scatter.png"></TD><TD><img src="delta_mag_scatter.png"></TD></TR>
-</TABLE>
-
-<TABLE BORDER=1>
-  <TR><TH colspan=2></TH>  <TH colspan=2>failed_acq</TH>  </TR> 
-  <TR><TH></TH>  <TH>N Stars</TH>  <TH colspan=1>stars</TH>  <TH
-  colspan=1>rate</TH>  </TR> 
-{% for mag in fails %}
-<TR><TD>{{mag.label}}</TD><TD>{{mag.n_stars}}</TD>
-<TD><A HREF="{{mag.fail_file}}">{{mag.n_failed}}</A></TD>
-<TD>{{"%.2f"|format(mag.fail_rate)}}</TD></TR>
-{% endfor %}
-</TABLE> 
-
-
-
-</BODY>
-</HTML>
+</body>
+</html>
 
 
       

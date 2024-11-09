@@ -13,7 +13,7 @@ import numpy as np
 import ska_matplotlib
 from astropy import units as u
 from astropy.table import Table, join
-from chandra_aca.star_probs import acq_success_prob, binomial_confidence_interval
+from chandra_aca.star_probs import acq_success_prob
 from cxotime import CxoTime
 from ska_helpers import logging
 
@@ -26,8 +26,6 @@ __all__ = [
     "mag_scatter_plot",
     "fail_rate_plot",
     "acq_stars_plot",
-    "get_acq_info",
-    "acq_fails",
     "make_html",
     "make_acq_plots",
 ]
@@ -198,6 +196,18 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
     for params in plot_params:
         params["function"](datasets[params["data"]], **params["parameters"])
 
+    for pp in plot_params:
+        pp["function"] = f"{pp['function'].__module__}.{pp['function'].__name__}"
+
+    result = {
+        "datasets": {
+            k: v.json() for k, v in datasets.items() if isinstance(v, utils.BinnedData)
+        },
+        "plot_params": plot_params,
+    }
+
+    return result
+
 
 @utils.mpl_plot(
     xlabel="AGASC magnitude (mag)",
@@ -274,7 +284,7 @@ def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     plt.ylim(0, 9)
 
 
-def make_html(nav_dict, acq_info, outdir):
+def make_html(data, outdir):
     """Render and write the basic page.
 
     Render and write the basic page, where nav_dict is a dictionary of the
@@ -283,145 +293,11 @@ def make_html(nav_dict, acq_info, outdir):
     contains the elements required for the extra table of failures at the
     bottom of the page, and outdir is the destination directory.
     """
-    fail_list = [fail for fail in acq_info["fails"].values() if fail["label"] != ""]
-
-    for label in acq_info["fails"]:
-        if label:
-            outfile = outdir / f"failed_acq_{label}_stars_list.html"
-        else:
-            outfile = outdir / "failed_acq_stars_list.html"
-        acq_info["fails"][label]["fail_file"] = outfile.relative_to(outdir)
-
-        template = JINJA_ENV.get_template("stars.html")
-        page = template.render(failed_stars=acq_info["fails"][label]["failed_stars"])
-        with open(outfile, "w") as fh:
-            fh.write(page)
-
     template = JINJA_ENV.get_template("index.html")
-    page = template.render(nav=nav_dict, fails=fail_list, rep=acq_info["info"])
+    page = template.render(time_ranges=data["time_ranges"])
+
     with open(outdir / "index.html", "w") as fh:
         fh.write(page)
-
-
-def get_acq_info(acqs, tname, range_datestart, range_datestop):
-    """
-    Generate a report dictionary for the time range.
-
-    :param acqs: recarray of all acquisition stars available in the table
-    :param tname: timerange string (e.g. 2010-M05)
-    :param range_datestart: cxotime.CxoTime of start of reporting interval
-    :param range_datestop: cxotime.CxoTime of end of reporting interval
-
-    :rtype: dict of report values
-    """
-    rep = {
-        "datestring": tname,
-        "datestart": range_datestart.date,
-        "datestop": range_datestop.date,
-        "human_date_start": range_datestart.datetime.strftime("%Y-%b-%d"),
-        "human_date_stop": range_datestop.datetime.strftime("%Y-%b-%d"),
-    }
-
-    range_acqs = acqs[
-        (acqs["tstart"] >= range_datestart.cxcsec)
-        & (acqs["tstart"] < range_datestop.cxcsec)
-    ]
-    # pred_acqs =  acqs[ (acqs["tstart"] >= CxoTime(pred_start).cxcsec)
-    # 	       & (acqs["tstart"] < CxoTime(mxdatestop).cxcsec) ]
-
-    rep["n_stars"] = len(range_acqs)
-    if not len(range_acqs):
-        raise NoStarError("No acq stars in range")
-    rep["n_failed"] = len(np.flatnonzero(range_acqs["acqid"] == 0))
-    rep["fail_rate"] = 1.0 * rep["n_failed"] / rep["n_stars"]
-
-    rep["n_failed_pred"] = len(range_acqs) - np.sum(range_acqs["p_acq_model"])
-    rep["fail_rate_pred"] = rep["n_failed_pred"] / len(range_acqs)
-
-    samples = (
-        np.random.uniform(size=1000 * len(range_acqs)).reshape((-1, len(range_acqs)))
-        < range_acqs["p_acq_model"][None]
-    )
-    n = len(range_acqs) - np.sum(samples, axis=1)
-
-    sigma_1_low, sigma_1_high = np.percentile(n, [15.9, 84.1])
-    rep["prob_less"] = sigma_1_low
-    rep["prob_more"] = sigma_1_high
-
-    r, low, high = binomial_confidence_interval(rep["n_failed"], rep["n_stars"])
-    rep["fail_rate_err_high"], rep["fail_rate_err_low"] = high - r, r - low
-
-    result = {
-        "info": rep,
-        "fails": acq_fails(acqs, range_datestart, range_datestop),
-    }
-    return result
-
-
-def acq_fails(acqs, range_datestart, range_datestop, outdir="out"):  #  noqa: ARG001  (commented out)
-    """Find the failures over the interval and find the tail mag failures.
-
-    Pass the failures to make_fail_html for the main star table and the
-    little ones (by mag bin).
-    """
-
-    fails = {}
-    range_acqs = acqs[
-        (acqs["tstart"] >= range_datestart.cxcsec)
-        & (acqs["tstart"] < range_datestop.cxcsec)
-    ]
-
-    failed_stars = [
-        {
-            "id": int(mfail["agasc_id"]),
-            "obsid": int(mfail["obsid"]),
-            "mag_exp": mfail["mag"],
-            "mag_obs": mfail["mag_obs"],
-            "acq_stat": "NOID",
-        }
-        for mfail in range_acqs[range_acqs["acqid"] == 0]
-    ]
-    n_stars = len(range_acqs)
-    n_failed = len(np.flatnonzero(range_acqs["acqid"] == 0))
-    fails[""] = {
-        # "mag_range": (-np.inf, np.inf),
-        "n_stars": n_stars,
-        "n_failed": n_failed,
-        "fail_rate": 0 if n_stars == 0 else n_failed / n_stars,
-        "label": "",
-        "failed_stars": failed_stars,
-    }
-
-    bin = 0.1
-    for tmag_start in np.arange(10.0, 10.8, 0.1):
-        label = f"{tmag_start:.1f}-{tmag_start + bin:.1f}"
-        mag_range_acqs = range_acqs[
-            (range_acqs["mag"] >= tmag_start) & (range_acqs["mag"] < (tmag_start + bin))
-        ]
-
-        mfailed_stars = [
-            {
-                "id": int(mfail["agasc_id"]),
-                "obsid": int(mfail["obsid"]),
-                "mag_exp": mfail["mag"],
-                "mag_obs": mfail["mag_obs"],
-                "acq_stat": "NOID",
-            }
-            for mfail in mag_range_acqs[mag_range_acqs["acqid"] == 0]
-        ]
-
-        n_stars = len(mag_range_acqs)
-        n_failed = len(np.flatnonzero(mag_range_acqs["acqid"] == 0))
-        fails[label] = {
-            "mag_range": (tmag_start, tmag_start + bin),
-            "n_stars": n_stars,
-            "n_failed": n_failed,
-            "fail_rate": 0 if n_stars == 0 else n_failed / n_stars,
-            "label": label,
-            "failed_stars": mfailed_stars,
-        }
-
-    return fails
 
 
 def get_data(remove_bad_stars=False):

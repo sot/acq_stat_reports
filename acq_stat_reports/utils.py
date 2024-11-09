@@ -34,6 +34,17 @@ class BinnedData:
             extra_cols=[] if extra_cols is None else extra_cols,
         )
 
+    def json(self):
+        """
+        Return the binned data as a JSON string.
+        """
+        return {
+            "bin_edges": {k: v.tolist() for k, v in self.bins.items()},
+            "data": {
+                col: self.binned_data[col].tolist() for col in self.binned_data.colnames
+            },
+        }
+
 
 def _mpl_hist_steps(arr, arr2=None):
     """
