@@ -7,12 +7,15 @@ import json
 import os
 from pathlib import Path
 
+import matplotlib
 from astropy import units as u
 from cxotime import CxoTime
 from ska_helpers import logging
 
 from acq_stat_reports import config as conf
 from acq_stat_reports import get_data, make_acq_plots, make_html
+
+matplotlib.use("agg")
 
 SKA = Path(os.environ["SKA"])
 
@@ -55,10 +58,6 @@ def get_parser():
 
 
 def main(sys_args=None):
-    import matplotlib
-
-    matplotlib.use("agg")
-
     args = get_parser().parse_args(sys_args)
 
     logger.setLevel(args.log_level.upper())
