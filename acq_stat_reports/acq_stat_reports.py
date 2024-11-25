@@ -285,6 +285,9 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     )
     ska_matplotlib.plot_cxctime(d["tstart"], y, ".")
 
+    ymax = np.max([y, y_high, y_low, y_2_high, y_2_low])
+    plt.ylim(0, 1.1 * ymax)
+
     plt.legend(
         [sigma_band_1, sigma_band_2],
         ["68.2% range", "95.4% range"],
