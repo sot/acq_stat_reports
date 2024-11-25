@@ -13,7 +13,7 @@ from cxotime import CxoTime
 from ska_helpers import logging
 
 from acq_stat_reports import config as conf
-from acq_stat_reports import get_data, make_acq_plots, make_html
+from acq_stat_reports import get_binned_data, get_data, make_acq_plots, make_html
 
 matplotlib.use("agg")
 
@@ -106,17 +106,16 @@ def main(sys_args=None):
         range_datestart = CxoTime(time_range["start"])
         range_datestop = CxoTime(time_range["stop"])
 
-        # ignore acquisition stars that are newer than the end of the range
-        # in question (happens during reprocessing) for consistency
-        all_acq_upto = all_acq[all_acq["tstart"] <= CxoTime(range_datestop).secs]
-
         conf.output_dir = str(output_dir)
         conf.close_figures = True
-        plots = make_acq_plots(
-            all_acq_upto,
+
+        datasets = get_binned_data(
+            all_acq,
             tstart=range_datestart.secs,
             tstop=range_datestop.secs,
         )
+
+        plots = make_acq_plots(datasets)
 
         data["time_ranges"].append(
             {

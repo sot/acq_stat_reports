@@ -23,6 +23,8 @@ __all__ = [
     "NoStarError",
     "logger",
     "get_data",
+    "get_binned_data",
+    "get_plot_params",
     "mag_scatter_plot",
     "fail_rate_plot",
     "acq_stars_plot",
@@ -43,7 +45,7 @@ class NoStarError(Exception):
     """
 
 
-def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
+def get_binned_data(acqs, tstart=0, tstop=None):
     """Make acquisition statistics plots.
 
     Make range of acquisition statistics plots:
@@ -57,16 +59,15 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
     :param acqs: all mission acq stars as recarray from Ska.DBI.fetchall
     :param tstart: range of interest tstart (Chandra secs)
     :param tstop: range of interest tstop (Chandra secs)
-    :param outdir: output directory for pngs
-    :rtype: None
+    :rtype: dict
 
     """
 
     if tstop is None:
         tstop = CxoTime().cxcsec
 
-    if outdir is not None and not outdir.exists():
-        outdir.mkdir(parents=True)
+    tstart = CxoTime(tstart).cxcsec
+    tstop = CxoTime(tstop).cxcsec
 
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
     two_year_acqs = acqs[
@@ -119,7 +120,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             bins={"tstart": np.arange(tstop, tstop - 2 * 365 * 86400, -86400 * 30)},
         ),
     }
+    return datasets
 
+
+def get_plot_params():
     plot_params = [
         {
             "description": "Timeline of the number of identified acq stars in the last two years",
@@ -216,6 +220,30 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             },
         },
     ]
+
+    return plot_params
+
+
+def make_acq_plots(datasets):
+    """Make acquisition statistics plots.
+
+    Make range of acquisition statistics plots:
+    mag_histogram.png - histogram of acq failures, full mag range
+    zoom_mag_histogram.png - histogram of acq failures, tail mag range
+    mag_pointhist.png
+    zoom_mag_pointhist.png
+    exp_mag_histogram.png
+    delta_mag_scatter.png
+
+    :param acqs: all mission acq stars as recarray from Ska.DBI.fetchall
+    :param tstart: range of interest tstart (Chandra secs)
+    :param tstop: range of interest tstop (Chandra secs)
+    :param outdir: output directory for pngs
+    :rtype: None
+
+    """
+
+    plot_params = get_plot_params()
 
     for params in plot_params:
         params["function"](datasets[params["data"]], **params["parameters"])
