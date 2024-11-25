@@ -124,7 +124,7 @@ def mpl_plot(**defaults):
 
                 if outdir and filename:
                     plt.savefig(outdir / filename)
-                if matplotlib.pyplot.isinteractive():
+                if not matplotlib.pyplot.isinteractive():
                     plt.close(fig)
 
         return wrapped_function
