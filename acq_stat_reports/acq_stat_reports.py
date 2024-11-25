@@ -73,6 +73,12 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs)
         & (acqs["tstart"] < tstop)
     ]
+    two_year_acqs_borderline = acqs[
+        (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs)
+        & (acqs["tstart"] < tstop)
+        & (acqs["p_acq_model"] > 0.25)
+        & (acqs["p_acq_model"] < 0.75)
+    ]
 
     t_ccd_bins = np.linspace(-14, 6, 21)
     if tstart < CxoTime("2020:001").cxcsec:
@@ -108,6 +114,10 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             data=two_year_acqs,
             bins={"tstart": np.arange(tstop, tstop - 2 * 365 * 86400, -86400 * 30)},
         ),
+        "binned_time_borderline": utils.BinnedData(
+            data=two_year_acqs_borderline,
+            bins={"tstart": np.arange(tstop, tstop - 2 * 365 * 86400, -86400 * 30)},
+        ),
     }
 
     plot_params = [
@@ -121,7 +131,21 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             "description": "Timeline of the acquisition failure rate in the last two years",
             "data": "binned_time",
             "function": fail_rate_plot,
-            "parameters": {"filename": "fail_rate_plot.png", "figscale": (2, 1)},
+            "parameters": {
+                "filename": "fail_rate_plot.png",
+                "figscale": (2, 1),
+                "title": "Failure Rate History",
+            },
+        },
+        {
+            "description": "Timeline of the acquisition failure rate in the last two years",
+            "data": "binned_time_borderline",
+            "function": fail_rate_plot,
+            "parameters": {
+                "filename": "fail_rate_plot_borderline.png",
+                "figscale": (2, 1),
+                "title": "Failure Rate History ($0.25 < p_{acq} < 0.75$)",
+            },
         },
         {
             "description": "Scatter plot of observed magnitude Vs catalog magnitude",
