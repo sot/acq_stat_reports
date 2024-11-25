@@ -33,7 +33,17 @@
     <h2> Acq Stats Report </h2>
 
     <p>
-      Some descriptive text
+      The figures in this page summarize the performance of the star acquisition process and its
+      relation with the acquisition probability model.
+    </p>
+
+    <p>
+      In all figures, the dark-shaded areas correspond to the 68.2% confidence intervals, and the
+      light-shaded areas correspond to the 95.4% confidence intervals. The confidence intervals are
+      computed using a resampling technique, assuming binomial probabilities given by the
+      acquisition probability model, taking into account the actual conditions for each observation
+      in the time range considered.
+      (observation time, CCD temperature, star magnitude, window halfwidth and color).
     </p>
 
     <ul class="nav nav-tabs" id="myTab" role="tablist">
@@ -57,9 +67,8 @@
     <div class="tab-content" id="myTabContent">
     {% for tr in time_ranges %} 
       <div class="tab-pane fade {% if loop.index == 1%}show active{% endif %}" id="{{ tr.name }}" role="tabpanel" aria-labelledby="{{ tr.name }}-tab">
-        <p>
-          Time Range: {{ tr.human_date_start }} through {{ tr.human_date_stop }} ({{ tr.datestart }} - {{ tr.datestop }})
-        </p>
+        <h3>{{ tr.human_date_start }} through {{ tr.human_date_stop }} ({{ tr.datestart[:8] }} - {{ tr.datestop[:8] }})</h3>
+
         <table>
           <tr><TD colspan=2><img src="{{ tr.name }}/fail_rate_plot.png"></td></tr>
           <tr><TD colspan=2><img src="{{ tr.name }}/fail_rate_plot_borderline.png"></td></tr>
