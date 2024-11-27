@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 # from typing import Callable
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -11,7 +12,7 @@ import numpy as np
 from astropy.table import Table
 from chandra_aca.star_probs import binomial_confidence_interval
 
-from acq_stat_reports.config import conf
+from acq_stat_reports import config as conf
 
 
 @dataclass
@@ -32,6 +33,17 @@ class BinnedData:
             bin_edges=self.bins,
             extra_cols=[] if extra_cols is None else extra_cols,
         )
+
+    def json(self):
+        """
+        Return the binned data as a JSON string.
+        """
+        return {
+            "bin_edges": {k: v.tolist() for k, v in self.bins.items()},
+            "data": {
+                col: self.binned_data[col].tolist() for col in self.binned_data.colnames
+            },
+        }
 
 
 def _mpl_hist_steps(arr, arr2=None):
@@ -88,13 +100,12 @@ def mpl_plot(**defaults):
 
             filename = options.pop("filename", None)
             ax = options.pop("ax", None)
-            close_figures = options.pop("close_figures", conf.close_figures)
             figsize = options.pop("figsize", (conf.figure_width, conf.figure_height))
             figscale = options.pop("figscale", (1, 1))
             figscale, _ = np.broadcast_arrays(figscale, [1, 1])
             figsize = (figsize[0] * figscale[0], figsize[1] * figscale[1])
 
-            outdir = options.pop("outdir", Path(conf.data_dir))
+            outdir = options.pop("outdir", Path(conf.output_dir))
 
             with plt.style.context(options.pop("style", conf.mpl_style)):
                 if ax is None:
@@ -113,7 +124,7 @@ def mpl_plot(**defaults):
 
                 if outdir and filename:
                     plt.savefig(outdir / filename)
-                if close_figures:
+                if not matplotlib.pyplot.isinteractive():
                     plt.close(fig)
 
         return wrapped_function

@@ -2,8 +2,6 @@
 Generate acquisition statistics report.
 """
 
-import argparse
-import json
 import os
 import warnings
 from pathlib import Path
@@ -12,19 +10,28 @@ import agasc
 import jinja2
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy.stats
 import ska_matplotlib
-import ska_report_ranges
 from astropy import units as u
 from astropy.table import Table, join
-from chandra_aca.star_probs import acq_success_prob, binomial_confidence_interval
+from chandra_aca.star_probs import acq_success_prob
 from cxotime import CxoTime
 from ska_helpers import logging
 
 from acq_stat_reports import utils
-from acq_stat_reports.config import conf
 
-SKA = Path(os.environ["SKA"])
+__all__ = [
+    "NoStarError",
+    "logger",
+    "get_data",
+    "get_binned_data",
+    "get_plot_params",
+    "mag_scatter_plot",
+    "fail_rate_plot",
+    "acq_stars_plot",
+    "make_html",
+    "make_acq_plots",
+]
+
 
 JINJA_ENV = jinja2.Environment(
     loader=jinja2.FileSystemLoader(Path(__file__).parent / "templates" / "acq_stats")
@@ -38,55 +45,7 @@ class NoStarError(Exception):
     """
 
 
-def get_parser():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--datadir",
-        default=Path(SKA / "data" / "acq_stat_reports"),
-        help="Output directory (default is $SKA/data/acq_stat_reports)",
-        type=Path,
-    )
-    parser.add_argument(
-        "--webdir",
-        default=Path(SKA / "www" / "ASPECT" / "acq_stat_reports"),
-        help="Output directory (default is $SKA/www/ASPECT/acq_stat_reports)",
-        type=Path,
-    )
-    parser.add_argument(
-        "--url",
-        help="URL root of the deployed page (default is /mta/ASPECT/acq_stat_reports/)",
-        default="/mta/ASPECT/acq_stat_reports/",
-    )
-    parser.add_argument(
-        "--start_time", help="Start time (default is NOW)", default=None
-    )
-    parser.add_argument(
-        "--days_back",
-        help="How many days to look back (default is 30)",
-        default=30,
-        type=int,
-    )
-    parser.add_argument(
-        "-v",
-        default="INFO",
-        choices=[
-            "DEBUG",
-            "INFO",
-            "WARNING",
-            "ERROR",
-            "CRITICAL",
-            "debug",
-            "info",
-            "warning",
-            "error",
-            "critical",
-        ],
-        help="Verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
-    )
-    return parser
-
-
-def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
+def get_binned_data(acqs, tstart=0, tstop=None):
     """Make acquisition statistics plots.
 
     Make range of acquisition statistics plots:
@@ -100,21 +59,26 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
     :param acqs: all mission acq stars as recarray from Ska.DBI.fetchall
     :param tstart: range of interest tstart (Chandra secs)
     :param tstop: range of interest tstop (Chandra secs)
-    :param outdir: output directory for pngs
-    :rtype: None
+    :rtype: dict
 
     """
 
     if tstop is None:
         tstop = CxoTime().cxcsec
 
-    if outdir is not None and not outdir.exists():
-        outdir.mkdir(parents=True)
+    tstart = CxoTime(tstart).cxcsec
+    tstop = CxoTime(tstop).cxcsec
 
     range_acqs = acqs[(acqs["tstart"] >= tstart) & (acqs["tstart"] < tstop)]
     two_year_acqs = acqs[
         (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs)
         & (acqs["tstart"] < tstop)
+    ]
+    two_year_acqs_borderline = acqs[
+        (acqs["tstart"] >= (CxoTime(tstop) - 2 * 365 * u.day).secs)
+        & (acqs["tstart"] < tstop)
+        & (acqs["p_acq_model"] > 0.25)
+        & (acqs["p_acq_model"] < 0.75)
     ]
 
     t_ccd_bins = np.linspace(-14, 6, 21)
@@ -151,8 +115,15 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             data=two_year_acqs,
             bins={"tstart": np.arange(tstop, tstop - 2 * 365 * 86400, -86400 * 30)},
         ),
+        "binned_time_borderline": utils.BinnedData(
+            data=two_year_acqs_borderline,
+            bins={"tstart": np.arange(tstop, tstop - 2 * 365 * 86400, -86400 * 30)},
+        ),
     }
+    return datasets
 
+
+def get_plot_params():
     plot_params = [
         {
             "description": "Timeline of the number of identified acq stars in the last two years",
@@ -164,7 +135,21 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
             "description": "Timeline of the acquisition failure rate in the last two years",
             "data": "binned_time",
             "function": fail_rate_plot,
-            "parameters": {"filename": "fail_rate_plot.png", "figscale": (2, 1)},
+            "parameters": {
+                "filename": "fail_rate_plot.png",
+                "figscale": (2, 1),
+                "title": "Failure Rate History",
+            },
+        },
+        {
+            "description": "Timeline of the acquisition failure rate in the last two years",
+            "data": "binned_time_borderline",
+            "function": fail_rate_plot,
+            "parameters": {
+                "filename": "fail_rate_plot_borderline.png",
+                "figscale": (2, 1),
+                "title": "Failure Rate History ($0.25 < p_{acq} < 0.75$)",
+            },
         },
         {
             "description": "Scatter plot of observed magnitude Vs catalog magnitude",
@@ -236,8 +221,44 @@ def make_acq_plots(acqs, tstart=0, tstop=None, outdir=None):
         },
     ]
 
+    return plot_params
+
+
+def make_acq_plots(datasets):
+    """Make acquisition statistics plots.
+
+    Make range of acquisition statistics plots:
+    mag_histogram.png - histogram of acq failures, full mag range
+    zoom_mag_histogram.png - histogram of acq failures, tail mag range
+    mag_pointhist.png
+    zoom_mag_pointhist.png
+    exp_mag_histogram.png
+    delta_mag_scatter.png
+
+    :param acqs: all mission acq stars as recarray from Ska.DBI.fetchall
+    :param tstart: range of interest tstart (Chandra secs)
+    :param tstop: range of interest tstop (Chandra secs)
+    :param outdir: output directory for pngs
+    :rtype: None
+
+    """
+
+    plot_params = get_plot_params()
+
     for params in plot_params:
         params["function"](datasets[params["data"]], **params["parameters"])
+
+    for pp in plot_params:
+        pp["function"] = f"{pp['function'].__module__}.{pp['function'].__name__}"
+
+    result = {
+        "datasets": {
+            k: v.json() for k, v in datasets.items() if isinstance(v, utils.BinnedData)
+        },
+        "plot_params": plot_params,
+    }
+
+    return result
 
 
 @utils.mpl_plot(
@@ -292,6 +313,9 @@ def fail_rate_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     )
     ska_matplotlib.plot_cxctime(d["tstart"], y, ".")
 
+    ymax = np.max([y, y_high, y_low, y_2_high, y_2_low])
+    plt.ylim(0, 1.1 * ymax)
+
     plt.legend(
         [sigma_band_1, sigma_band_2],
         ["68.2% range", "95.4% range"],
@@ -315,7 +339,7 @@ def acq_stars_plot(data, **kwargs):  # noqa: ARG001 (kwargs is neeeded by the de
     plt.ylim(0, 9)
 
 
-def make_html(nav_dict, rep_dict, fail_dict, outdir):
+def make_html(data, outdir):
     """Render and write the basic page.
 
     Render and write the basic page, where nav_dict is a dictionary of the
@@ -325,136 +349,13 @@ def make_html(nav_dict, rep_dict, fail_dict, outdir):
     bottom of the page, and outdir is the destination directory.
     """
     template = JINJA_ENV.get_template("index.html")
-    page = template.render(nav=nav_dict, fails=fail_dict, rep=rep_dict)
+    page = template.render(time_ranges=data["time_ranges"])
+
     with open(outdir / "index.html", "w") as fh:
         fh.write(page)
 
 
-def acq_info(acqs, tname, range_datestart, range_datestop):
-    """
-    Generate a report dictionary for the time range.
-
-    :param acqs: recarray of all acquisition stars available in the table
-    :param tname: timerange string (e.g. 2010-M05)
-    :param range_datestart: cxotime.CxoTime of start of reporting interval
-    :param range_datestop: cxotime.CxoTime of end of reporting interval
-
-    :rtype: dict of report values
-    """
-    pred = json.load(open(SKA / "data" / "acq_stat_reports" / "acq_fail_fitfile.json"))
-
-    rep = {
-        "datestring": tname,
-        "datestart": range_datestart.date,
-        "datestop": range_datestop.date,
-        "human_date_start": range_datestart.datetime.strftime("%Y-%b-%d"),
-        "human_date_stop": range_datestop.datetime.strftime("%Y-%b-%d"),
-    }
-
-    range_acqs = acqs[
-        (acqs["tstart"] >= range_datestart.cxcsec)
-        & (acqs["tstart"] < range_datestop.cxcsec)
-    ]
-    # pred_acqs =  acqs[ (acqs["tstart"] >= CxoTime(pred_start).cxcsec)
-    # 	       & (acqs["tstart"] < CxoTime(mxdatestop).cxcsec) ]
-
-    rep["n_stars"] = len(range_acqs)
-    if not len(range_acqs):
-        raise NoStarError("No acq stars in range")
-    rep["n_failed"] = len(np.flatnonzero(range_acqs["acqid"] == 0))
-    rep["fail_rate"] = 1.0 * rep["n_failed"] / rep["n_stars"]
-
-    mean_time = (
-        CxoTime(rep["datestart"]).cxcsec + CxoTime(rep["datestop"]).cxcsec
-    ) / 2.0
-    mean_time_d_year = (mean_time - pred["time0"]) / (86400 * 365.25)
-    rep["fail_rate_pred"] = mean_time_d_year * pred["m"] + pred["b"]
-    rep["n_failed_pred"] = int(round(rep["fail_rate_pred"] * rep["n_stars"]))
-
-    rep["prob_less"] = scipy.stats.poisson.cdf(rep["n_failed"], rep["n_failed_pred"])
-    rep["prob_more"] = 1 - scipy.stats.poisson.cdf(
-        rep["n_failed"] - 1, rep["n_failed_pred"]
-    )
-
-    r, low, high = binomial_confidence_interval(rep["n_failed"], rep["n_stars"])
-    rep["fail_rate_err_high"], rep["fail_rate_err_low"] = high - r, r - low
-
-    return rep
-
-
-def make_fail_html(stars, outfile):
-    """
-    Render and write the expanded table of failed stars
-    """
-    template = JINJA_ENV.get_template("stars.html")
-    page = template.render(failed_stars=stars)
-    f = open(outfile, "w")
-    f.write(page)
-    f.close()
-
-
-def acq_fails(acqs, range_datestart, range_datestop, outdir="out"):  #  noqa: ARG001  (commented out)
-    """Find the failures over the interval and find the tail mag failures.
-
-    Pass the failures to make_fail_html for the main star table and the
-    little ones (by mag bin).
-    """
-
-    fails = []
-    range_acqs = acqs[
-        (acqs["tstart"] >= range_datestart.cxcsec)
-        & (acqs["tstart"] < range_datestop.cxcsec)
-    ]
-
-    all_fails = range_acqs[range_acqs["acqid"] == 0]
-    failed_stars = []
-    for fail in all_fails:
-        star = {
-            "id": fail["agasc_id"],
-            "obsid": fail["obsid"],
-            "mag_exp": fail["mag"],
-            "mag_obs": fail["mag_obs"],
-            "acq_stat": "NOID",
-        }
-        failed_stars.append(star)
-    make_fail_html(failed_stars, outdir / "failed_acq_stars_list.html")
-
-    bin = 0.1
-    for tmag_start in np.arange(10.0, 10.8, 0.1):
-        mag_range_acqs = range_acqs[
-            (range_acqs["mag"] >= tmag_start) & (range_acqs["mag"] < (tmag_start + bin))
-        ]
-        mfailed_stars = []
-
-        mag_fail_acqs = mag_range_acqs[mag_range_acqs["acqid"] == 0]
-        for mfail in mag_fail_acqs:
-            star = {
-                "id": mfail["agasc_id"],
-                "obsid": mfail["obsid"],
-                "mag_exp": mfail["mag"],
-                "mag_obs": mfail["mag_obs"],
-                "acq_stat": "NOID",
-            }
-            mfailed_stars.append(star)
-        failed_star_file = outdir / f"failed_acq_{tmag_start:.1f}_stars_list.html"
-        make_fail_html(mfailed_stars, failed_star_file)
-
-        mag_fail = {
-            "n_stars": len(mag_range_acqs),
-            "n_failed": len(np.flatnonzero(mag_range_acqs["acqid"] == 0)),
-        }
-        if mag_fail["n_stars"] == 0:
-            mag_fail["fail_rate"] = 0
-        else:
-            mag_fail["fail_rate"] = mag_fail["n_failed"] * 1.0 / mag_fail["n_stars"]
-        mag_fail["label"] = "%0.1f-%0.1f" % (tmag_start, tmag_start + bin)
-        mag_fail["fail_file"] = failed_star_file.name
-        fails.append(mag_fail)
-
-    return fails
-
-
-def get_data():
+def get_data(remove_bad_stars=False):
     mica_acq_stats_file = (
         Path(os.environ["SKA"]) / "data" / "acq_stats" / "acq_stats.h5"
     )
@@ -496,7 +397,7 @@ def get_data():
     # Remove known bad stars
     bad_stars = agasc.get_supplement_table("bad")
     bad = np.isin(all_acq["agasc_id"], bad_stars["agasc_id"]) | all_acq["known_bad"]
-    if conf.remove_bad_stars:
+    if remove_bad_stars:
         all_acq = all_acq[~bad]
     else:
         all_acq["bad_star"] = bad
@@ -521,75 +422,3 @@ def get_data():
         all_acq["color"].format = ".2f"
 
     return all_acq
-
-
-def main():
-    import matplotlib
-
-    matplotlib.use("agg")
-
-    args = get_parser().parse_args()
-
-    logger.setLevel(args.v.upper())
-
-    now = CxoTime()
-    logger.info("---------- acq stat reports update at %s ----------" % (now.iso))
-
-    if args.start_time is None:
-        to_update = ska_report_ranges.get_update_ranges(args.days_back)
-    else:
-        start = CxoTime(args.start_time)
-        to_update = ska_report_ranges.get_update_ranges(
-            int((now - start).to(u.day).value)
-        )
-
-    all_acq = get_data()
-
-    for tname in sorted(to_update.keys()):
-        logger.debug("Attempting to update %s" % tname)
-        range_datestart = CxoTime(to_update[tname]["start"])
-        range_datestop = CxoTime(to_update[tname]["stop"])
-
-        # ignore acquisition stars that are newer than the end of the range
-        # in question (happens during reprocessing) for consistency
-        all_acq_upto = all_acq[all_acq["tstart"] <= CxoTime(range_datestop).secs]
-
-        webout = args.webdir / f"{to_update[tname]['year']}" / to_update[tname]["subid"]
-        webout.mkdir(parents=True, exist_ok=True)
-
-        dataout = (
-            args.datadir / f"{to_update[tname]['year']}" / to_update[tname]["subid"]
-        )
-        dataout.mkdir(parents=True, exist_ok=True)
-
-        logger.debug("Plots and HTML to %s" % webout)
-        logger.debug("JSON to  %s" % dataout)
-
-        rep = acq_info(all_acq_upto, tname, range_datestart, range_datestop)
-        with open(dataout / "rep.json", "w") as rep_file:
-            rep_file.write(json.dumps(rep, sort_keys=True, indent=4))
-
-        fails = acq_fails(all_acq_upto, range_datestart, range_datestop, outdir=webout)
-        with open(dataout / "fail.json", "w") as fail_file:
-            fail_file.write(json.dumps(fails, sort_keys=True, indent=4))
-
-        prev_range = ska_report_ranges.get_prev(to_update[tname])
-        next_range = ska_report_ranges.get_next(to_update[tname])
-        nav = {
-            "main": args.url,
-            "next": f"{args.url}/{next_range['year']}/{next_range['subid']}/index.html",
-            "prev": f"{args.url}/{prev_range['year']}/{prev_range['subid']}/index.html",
-        }
-
-        conf.data_dir = str(webout)
-        conf.close_figures = True
-        make_acq_plots(
-            all_acq_upto,
-            tstart=range_datestart.secs,
-            tstop=range_datestop.secs,
-        )
-        make_html(nav, rep, fails, outdir=webout)
-
-
-if __name__ == "__main__":
-    main()
